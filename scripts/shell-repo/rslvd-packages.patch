@@ -1,0 +1,1918 @@
+diff --git a/packages/apt/build.sh b/packages/apt/build.sh
+index cb40498..23a702c 100644
+--- a/packages/apt/build.sh
++++ b/packages/apt/build.sh
+@@ -3,12 +3,12 @@ TERMUX_PKG_DESCRIPTION="Front-end for the dpkg package manager"
+ TERMUX_PKG_LICENSE="GPL-2.0"
+ TERMUX_PKG_MAINTAINER="@termux"
+ TERMUX_PKG_VERSION="2.8.1"
+-TERMUX_PKG_REVISION=2
++TERMUX_PKG_REVISION=3
+ # old tarball are removed in https://deb.debian.org/debian/pool/main/a/apt/apt_${TERMUX_PKG_VERSION}.tar.xz
+ TERMUX_PKG_SRCURL=https://salsa.debian.org/apt-team/apt/-/archive/${TERMUX_PKG_VERSION}/apt-${TERMUX_PKG_VERSION}.tar.bz2
+ TERMUX_PKG_SHA256=87ca18392c10822a133b738118505f7d04e0b31ba1122bf5d32911311cb2dc7e
+ # apt-key requires utilities from coreutils, findutils, gpgv, grep, sed.
+-TERMUX_PKG_DEPENDS="coreutils, dpkg, findutils, gpgv, grep, libandroid-glob, libbz2, libc++, libiconv, libgcrypt, libgnutls, liblz4, liblzma, sed, termux-keyring, termux-licenses, xxhash, zlib, zstd"
++TERMUX_PKG_DEPENDS="coreutils, dpkg, findutils, gpgv, grep, libandroid-glob, libbz2, libc++, libiconv, libgcrypt, libgnutls, liblz4, liblzma, sed, rslvd-keyring, rslvd-licenses, xxhash, zlib, zstd"
+ TERMUX_PKG_BUILD_DEPENDS="docbook-xsl,libdb"
+ TERMUX_PKG_CONFLICTS="apt-transport-https, libapt-pkg, unstable-repo, game-repo, science-repo"
+ TERMUX_PKG_REPLACES="apt-transport-https, libapt-pkg, unstable-repo, game-repo, science-repo"
+@@ -74,10 +74,8 @@ termux_step_pre_configure() {
+ 
+ termux_step_post_make_install() {
+ 	{
+-		echo "# The main termux repository, with cloudflare cache"
+-		echo "deb https://packages-cf.termux.dev/apt/termux-main/ stable main"
+-		echo "# The main termux repository, without cloudflare cache"
+-		echo "# deb https://packages.termux.dev/apt/termux-main/ stable main"
++		echo "# The main rslvd package repository"
++		echo "deb https://repo.rslvd.net/apt/rslvd-main stable main"
+ 	} > $TERMUX_PREFIX/etc/apt/sources.list
+ 
+ 	# apt-transport-tor
+diff --git a/packages/bash/build.sh b/packages/bash/build.sh
+index f00e7e5..b8a1499 100644
+--- a/packages/bash/build.sh
++++ b/packages/bash/build.sh
+@@ -6,7 +6,8 @@ TERMUX_PKG_VERSION=5.3.15
+ TERMUX_PKG_SRCURL="https://mirrors.kernel.org/gnu/bash/bash-${TERMUX_PKG_VERSION%.*}.tar.gz"
+ TERMUX_PKG_SHA256=0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba
+ TERMUX_PKG_AUTO_UPDATE=false
+-TERMUX_PKG_DEPENDS="libandroid-support, libiconv, readline (>= 8.3), termux-tools"
++TERMUX_PKG_REVISION=1
++TERMUX_PKG_DEPENDS="libandroid-support, libiconv, readline (>= 8.3), rslvd-tools"
+ TERMUX_PKG_RECOMMENDS="command-not-found, bash-completion"
+ TERMUX_PKG_BREAKS="bash-dev"
+ TERMUX_PKG_REPLACES="bash-dev"
+diff --git a/packages/libpcap/build.sh b/packages/libpcap/build.sh
+index 169189f..c62a370 100644
+--- a/packages/libpcap/build.sh
++++ b/packages/libpcap/build.sh
+@@ -4,7 +4,7 @@ TERMUX_PKG_LICENSE="BSD 3-Clause"
+ TERMUX_PKG_MAINTAINER="@termux"
+ TERMUX_PKG_VERSION=1.10.5
+ TERMUX_PKG_REVISION=1
+-TERMUX_PKG_SRCURL=https://fossies.org/linux/misc/libpcap-${TERMUX_PKG_VERSION}.tar.xz
++TERMUX_PKG_SRCURL=https://www.tcpdump.org/release/libpcap-${TERMUX_PKG_VERSION}.tar.xz
+ TERMUX_PKG_SHA256=84fa89ac6d303028c1c5b754abff77224f45eca0a94eb1a34ff0aa9ceece3925
+ TERMUX_PKG_BREAKS="libpcap-dev"
+ TERMUX_PKG_REPLACES="libpcap-dev"
+diff --git a/packages/rslvd-am-socket/build.sh b/packages/rslvd-am-socket/build.sh
+new file mode 100644
+index 0000000..4c9e863
+--- /dev/null
++++ b/packages/rslvd-am-socket/build.sh
+@@ -0,0 +1,36 @@
++TERMUX_PKG_HOMEPAGE=https://github.com/termux/termux-am-socket
++TERMUX_PKG_DESCRIPTION="Socket-based am client for the rslvd shell (rslvd build of termux-am-socket)"
++TERMUX_PKG_LICENSE="GPL-3.0"
++TERMUX_PKG_MAINTAINER="@termux"
++TERMUX_PKG_VERSION=1.5.0
++TERMUX_PKG_REVISION=2
++TERMUX_PKG_SRCURL=https://github.com/termux/termux-am-socket/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
++TERMUX_PKG_SHA256=5175023c7fd675492451a72d06b75c772f257685b69fe117227bae5a5e6f5494
++TERMUX_PKG_DEPENDS="libc++"
++TERMUX_PKG_PROVIDES="termux-am-socket (= 1.5.0-2)"
++TERMUX_PKG_REPLACES="termux-am-socket"
++TERMUX_PKG_CONFLICTS="termux-am-socket"
++source "$TERMUX_SCRIPTDIR/scripts/rslvd_rebrand.sh"
++
++termux_step_post_get_source() {
++
++	for file in "${TERMUX_PKG_SRCDIR}/"*; do
++		sed -i'' -E -e "s|^(TERMUX_AM_SOCKET_VERSION=).*|\1$TERMUX_PKG_FULLVERSION|" \
++			-e "s|\@TERMUX_APP_PACKAGE\@|${TERMUX_APP_PACKAGE}|g" \
++			-e "s|\@TERMUX_APPS_DIR\@|${TERMUX_APPS_DIR}|g" \
++			"$file"
++	done
++
++}
++
++termux_step_post_make_install() {
++	# The termux-am wrapper only talks to the app's AM socket server, which the
++	# rslvd app does not run; `am` / `rslvd-am` (rslvd-am package) work instead.
++	rm -f "$TERMUX_PREFIX/bin/termux-am"
++	mv "$TERMUX_PREFIX/bin/termux-am-socket" "$TERMUX_PREFIX/bin/rslvd-am-socket"
++	ln -sf rslvd-am-socket "$TERMUX_PREFIX/bin/termux-am-socket"
++}
++
++termux_step_post_massage() {
++	rslvd_rebrand_replace_string "/data/data/com.termux" "$TERMUX_APP__DATA_DIR"
++}
+diff --git a/packages/termux-am/build.sh b/packages/rslvd-am/build.sh
+similarity index 76%
+rename from packages/termux-am/build.sh
+rename to packages/rslvd-am/build.sh
+index d7d9758..f0cfaee 100644
+--- a/packages/termux-am/build.sh
++++ b/packages/rslvd-am/build.sh
+@@ -1,19 +1,22 @@
+ # Contributor: @michalbednarski
+ TERMUX_PKG_HOMEPAGE=https://github.com/termux/TermuxAm
+-TERMUX_PKG_DESCRIPTION="Android Oreo-compatible am command reimplementation"
++TERMUX_PKG_DESCRIPTION="Android Oreo-compatible am command reimplementation (rslvd build of termux-am)"
+ TERMUX_PKG_LICENSE="Apache-2.0"
+ TERMUX_PKG_MAINTAINER="Michal Bednarski @michalbednarski"
+ TERMUX_PKG_VERSION=0.8.0
+-TERMUX_PKG_REVISION=2
++TERMUX_PKG_REVISION=3
+ TERMUX_PKG_SRCURL=https://github.com/termux/TermuxAm/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
+ TERMUX_PKG_SHA256=7d4cfa2bfff93d5fc89fc89e537d2c072e08918276b140b7ed48ea45ebfbe8f3
+ TERMUX_PKG_PLATFORM_INDEPENDENT=true
+ TERMUX_PKG_BUILD_IN_SRC=true
+-TERMUX_PKG_CONFLICTS="termux-tools (<< 0.51)"
++TERMUX_PKG_PROVIDES="termux-am (= 0.8.0-3)"
++TERMUX_PKG_REPLACES="termux-am"
++TERMUX_PKG_CONFLICTS="termux-am, termux-tools (<< 0.51)"
++source "$TERMUX_SCRIPTDIR/scripts/rslvd_rebrand.sh"
+ _GRADLE_VERSION=8.10.2
+ 
+ termux_step_post_get_source() {
+-	sed -i'' -E -e "s|\@TERMUX_PREFIX\@|${TERMUX_PREFIX}|g" "$TERMUX_PKG_SRCDIR/am-libexec-packaged"
++	sed -i'' -E -e "s|\@TERMUX_PREFIX\@|${TERMUX_PREFIX}|g" -e "s|libexec/termux-am/|libexec/rslvd-am/|g" "$TERMUX_PKG_SRCDIR/am-libexec-packaged"
+ 	sed -i'' -E -e "s|\@TERMUX_APP_PACKAGE\@|${TERMUX_APP_PACKAGE}|g" "$TERMUX_PKG_SRCDIR/app/src/main/java/com/termux/termuxam/FakeContext.java"
+ }
+ 
+@@ -39,6 +42,7 @@ termux_step_make() {
+ 
+ termux_step_make_install() {
+ 	cp $TERMUX_PKG_SRCDIR/am-libexec-packaged $TERMUX_PREFIX/bin/am
+-	mkdir -p $TERMUX_PREFIX/libexec/termux-am
+-	cp $TERMUX_PKG_SRCDIR/app/build/outputs/apk/release/app-release-unsigned.apk $TERMUX_PREFIX/libexec/termux-am/am.apk
++	mkdir -p $TERMUX_PREFIX/libexec/rslvd-am
++	cp $TERMUX_PKG_SRCDIR/app/build/outputs/apk/release/app-release-unsigned.apk $TERMUX_PREFIX/libexec/rslvd-am/am.apk
++	ln -sf am $TERMUX_PREFIX/bin/rslvd-am
+ }
+diff --git a/packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_apps_info_app_version_name b/packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_apps_info_app_version_name
+similarity index 100%
+rename from packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_apps_info_app_version_name
+rename to packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_apps_info_app_version_name
+diff --git a/packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_apps_info_env_variable b/packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_apps_info_env_variable
+similarity index 100%
+rename from packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_apps_info_env_variable
+rename to packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_apps_info_env_variable
+diff --git a/packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_scoped_env_variable b/packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_scoped_env_variable
+similarity index 100%
+rename from packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_scoped_env_variable
+rename to packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__bash__termux_scoped_env_variable
+diff --git a/packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_apps_info_app_version_name b/packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_apps_info_app_version_name
+similarity index 100%
+rename from packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_apps_info_app_version_name
+rename to packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_apps_info_app_version_name
+diff --git a/packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_apps_info_env_variable b/packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_apps_info_env_variable
+similarity index 100%
+rename from packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_apps_info_env_variable
+rename to packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_apps_info_env_variable
+diff --git a/packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_scoped_env_variable b/packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_scoped_env_variable
+similarity index 100%
+rename from packages/termux-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_scoped_env_variable
+rename to packages/rslvd-core/app/main/scripts/termux/shell/command/environment/termux_core__sh__termux_scoped_env_variable
+diff --git a/packages/termux-core/build.sh b/packages/rslvd-core/build.sh
+similarity index 81%
+rename from packages/termux-core/build.sh
+rename to packages/rslvd-core/build.sh
+index 96eddd1..54590e7 100644
+--- a/packages/termux-core/build.sh
++++ b/packages/rslvd-core/build.sh
+@@ -1,14 +1,18 @@
+ TERMUX_PKG_HOMEPAGE=https://github.com/termux/termux-core-package
+-TERMUX_PKG_DESCRIPTION="Utils and libraries for Termux core"
++TERMUX_PKG_DESCRIPTION="Utils and libraries for the rslvd shell core (rslvd build of termux-core)"
+ TERMUX_PKG_LICENSE="MIT"
+ TERMUX_PKG_MAINTAINER="@termux"
+ TERMUX_PKG_VERSION=0.4.0
+-TERMUX_PKG_REVISION=1
++TERMUX_PKG_REVISION=2
+ TERMUX_PKG_SRCURL=https://github.com/termux/termux-core-package/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
+ TERMUX_PKG_SHA256=af6299f341292ca98d1748a06e342fe29fbc9eb485a7c1ba5c9f91ba72b4f44a
+ TERMUX_PKG_ESSENTIAL=true
+ TERMUX_PKG_BUILD_IN_SRC=true
+-TERMUX_PKG_AUTO_UPDATE=true
++TERMUX_PKG_AUTO_UPDATE=false
++TERMUX_PKG_PROVIDES="termux-core (= 0.4.0-2)"
++TERMUX_PKG_REPLACES="termux-core"
++TERMUX_PKG_CONFLICTS="termux-core"
++source "$TERMUX_SCRIPTDIR/scripts/rslvd_rebrand.sh"
+ TERMUX_PKG_EXTRA_MAKE_ARGS="TERMUX_CORE_PKG__VERSION=${TERMUX_PKG_VERSION} TERMUX_CORE_PKG__ARCH=${TERMUX_ARCH} \
+ TERMUX__NAME=${TERMUX__NAME} TERMUX__LNAME=${TERMUX__LNAME} \
+ TERMUX__REPOS_HOST_ORG_NAME=${TERMUX__REPOS_HOST_ORG_NAME} TERMUX__REPOS_HOST_ORG_URL=${TERMUX__REPOS_HOST_ORG_URL} \
+@@ -31,6 +35,12 @@ TERMUX_PKGS__REPO_NAME=${TERMUX_PKGS__REPO_NAME} TERMUX_PKGS__REPO_URL=${TERMUX_
+ TERMUX_PKGS__BUILD__REPO_ROOT_DIR=${TERMUX_PKGS__BUILD__REPO_ROOT_DIR} \
+ TERMUX_CORE_PKG__REPO_NAME=${TERMUX_CORE_PKG__REPO_NAME} TERMUX_CORE_PKG__REPO_URL=${TERMUX_CORE_PKG__REPO_URL}"
+ 
++termux_step_pre_configure() {
++	# Upstream Makefile hardcodes packages/termux-core/ for its replace-scripts helper.
++	sed -i "s|\$(TERMUX_PKGS__BUILD__REPO_ROOT_DIR)/packages/termux-core/build/scripts/|$TERMUX_PKG_BUILDER_DIR/build/scripts/|" \
++		"$TERMUX_PKG_SRCDIR/Makefile"
++}
++
+ termux_step_install_license() {
+ 	mkdir -p "$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/licenses"
+ 	cp -af "$TERMUX_PKG_SRCDIR/LICENSE" "$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/copyright"
+@@ -44,3 +54,7 @@ termux_step_strip_elf_symbols() {
+ 		\( ! -path "./libexec/installed-tests/termux-core/*" \) \
+ 	\)
+ }
++
++termux_step_post_massage() {
++	rslvd_rebrand_bins
++}
+diff --git a/packages/termux-core/build/scripts/termux-replace-termux-core-src-scripts b/packages/rslvd-core/build/scripts/termux-replace-termux-core-src-scripts
+similarity index 100%
+rename from packages/termux-core/build/scripts/termux-replace-termux-core-src-scripts
+rename to packages/rslvd-core/build/scripts/termux-replace-termux-core-src-scripts
+diff --git a/packages/termux-exec/build.sh b/packages/rslvd-exec/build.sh
+similarity index 89%
+rename from packages/termux-exec/build.sh
+rename to packages/rslvd-exec/build.sh
+index c73c3df..067da25 100644
+--- a/packages/termux-exec/build.sh
++++ b/packages/rslvd-exec/build.sh
+@@ -1,15 +1,19 @@
+ TERMUX_PKG_HOMEPAGE=https://github.com/termux/termux-exec-package
+-TERMUX_PKG_DESCRIPTION="Utils and libraries for Termux exec including a LD_PRELOAD shared library for proper functioning of the Termux execution environment"
++TERMUX_PKG_DESCRIPTION="Utils and libraries for rslvd exec including a LD_PRELOAD shared library for proper functioning of the rslvd shell execution environment (rslvd build of termux-exec)"
+ TERMUX_PKG_LICENSE="Apache-2.0"
+ TERMUX_PKG_MAINTAINER="@termux"
+ TERMUX_PKG_VERSION=1:2.5.0
+-TERMUX_PKG_REVISION=1
++TERMUX_PKG_REVISION=2
+ TERMUX_PKG_SRCURL=https://github.com/termux/termux-exec-package/archive/refs/tags/v${TERMUX_PKG_VERSION:2}.tar.gz
+ TERMUX_PKG_SHA256=5c5eeb1565ad4379ce227ee3017f9fe88611c03ca91f00b8a3fadcf6f7396f51
+-TERMUX_PKG_BUILD_DEPENDS="termux-core-static"
++TERMUX_PKG_BUILD_DEPENDS="rslvd-core-static"
+ TERMUX_PKG_ESSENTIAL=true
+ TERMUX_PKG_BUILD_IN_SRC=true
+-TERMUX_PKG_AUTO_UPDATE=true
++TERMUX_PKG_AUTO_UPDATE=false
++TERMUX_PKG_PROVIDES="termux-exec (= 1:2.5.0-2)"
++TERMUX_PKG_REPLACES="termux-exec"
++TERMUX_PKG_CONFLICTS="termux-exec"
++source "$TERMUX_SCRIPTDIR/scripts/rslvd_rebrand.sh"
+ TERMUX_PKG_EXTRA_MAKE_ARGS="TERMUX_EXEC_PKG__VERSION=${TERMUX_PKG_VERSION} TERMUX_EXEC_PKG__ARCH=${TERMUX_ARCH} \
+ TERMUX__NAME=${TERMUX__NAME} TERMUX__LNAME=${TERMUX__LNAME} \
+ TERMUX__REPOS_HOST_ORG_NAME=${TERMUX__REPOS_HOST_ORG_NAME} \
+@@ -64,6 +68,8 @@ termux_step_post_massage() {
+ 		$TERMUX_ELF_CLEANER --api-level 28 "$LIBTERMUX_EXEC__NOS__C__TESTS_PATH/bin/libtermux-exec_nos_c_tre_runtime-binary-tests-nofsanitize28"
+ 		printf "%s\n\n" "Install libtermux-exec_nos_c_tre_runtime-binary-tests for TERMUX_PKG_API_LEVEL '$TERMUX_PKG_API_LEVEL' successful"
+ 	fi
++
++	rslvd_rebrand_bins
+ }
+ 
+ termux_step_create_debscripts() {
+diff --git a/packages/rslvd-keyring/build.sh b/packages/rslvd-keyring/build.sh
+new file mode 100644
+index 0000000..8cb4cbd
+--- /dev/null
++++ b/packages/rslvd-keyring/build.sh
+@@ -0,0 +1,27 @@
++TERMUX_PKG_HOMEPAGE=https://repo.rslvd.net
++TERMUX_PKG_DESCRIPTION="GPG public key for the rslvd package repository (repo.rslvd.net)"
++TERMUX_PKG_LICENSE="Apache-2.0"
++TERMUX_PKG_MAINTAINER="rslvd <repo@rslvd.net>"
++TERMUX_PKG_VERSION=1.0
++TERMUX_PKG_AUTO_UPDATE=false
++TERMUX_PKG_SKIP_SRC_EXTRACT=true
++TERMUX_PKG_PLATFORM_INDEPENDENT=true
++TERMUX_PKG_ESSENTIAL=true
++TERMUX_PKG_PROVIDES="termux-keyring (= 3.14)"
++TERMUX_PKG_REPLACES="termux-keyring"
++TERMUX_PKG_CONFLICTS="termux-keyring"
++
++termux_step_make_install() {
++	local GPG_SHARE_DIR="$TERMUX_PREFIX/share/rslvd-keyring"
++
++	rm -rf "$GPG_SHARE_DIR"
++	mkdir -p "$GPG_SHARE_DIR"
++
++	# Signing key for https://repo.rslvd.net/apt/rslvd-main (InRelease / Release.gpg).
++	install -Dm644 "$TERMUX_PKG_BUILDER_DIR/rslvd-repo.gpg" "$GPG_SHARE_DIR/rslvd-repo.gpg"
++
++	local GPG_DIR="$TERMUX_PREFIX/etc/apt/trusted.gpg.d"
++	mkdir -p "$GPG_DIR"
++	find "$GPG_DIR" -xtype l -printf 'Deleting removed key: %p\n' -delete
++	ln -sf "$GPG_SHARE_DIR/rslvd-repo.gpg" "$GPG_DIR/rslvd-repo.gpg"
++}
+diff --git a/packages/rslvd-keyring/rslvd-repo.gpg b/packages/rslvd-keyring/rslvd-repo.gpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff32b0f52fd82cc081695095cf1efc0767a18690
+GIT binary patch
+literal 1164
+zcmV;71ateD0u2OepT=nc5CEK4HGY&aGcPm%%1tAF`8Tj2)@Bsr+Oa%^<k|3o<v};d
+zQ*2tEHrE|Fq5JOx@|H%zD*stI9<QSl|8PJkgLSxXd@CNVO%)9l;k4`}pJR;KcfJYo
+z!5;O@ZG>@152~%GZE^TFsOViT(?o8`sz}v~I3szN1lU$esF%cBuILxjLCojj*Ggo0
+zxh+(3bGyuwA-Y6+Z|sEn`Wd_ntpBw%{9<GQrh-J>CRq#zsZ28qvks28t?V6r;@LJ~
+zj-G>FpW#|+YXtuIdj%a7=QtolAuc4|*}0nXC%rU;C9ZP`onbwN9Q%^hR^w*~rDjIa
+zP_lj%>>6i)b&Geq=-+ojUNAjID9CSAjHzHWO9XVR9*s_8k`+<5<BsIYg>0whmVeey
+z4%H{;T$N2X28zFBSe!Lc{Ii=f*668-mGZRXYveX;*WQRc!7fEn{Hkss%3s>~4r&op
+zJUyXd0-&q_n3yy5@OR?x%E?wh`Fn3vK+r4dV6QR&&R>F!k~*e|5Wsi#c|ACZk6PG!
+za?tI>$n)#hg3<KmOUIaEcBtuDi>1WDA9d5Xzo)xEmUAi%dhcdqGkgDAFZK~MC1m9k
+z3c7KOmA27u+|Y{Qxb^~W09wB$F5v|XF@`pPuEs(dVjOGlmY6Kvj=cBhnljALAK=o$
+zTu<GOW8!E2x0e7B0RRECDROgcc4Q!MVPk7yXJsIAWpHnEX>@OLc_2J;WpHmma&v5U
+zWG-%HbUuj!P6QJH3II43Aq14u`FVCHbL;L!N*AXTSNijt+c^aSYM;hw0viJb3ke7Z
+z0tOWd2?z@U1Qr4V0RkQY0vCV)3JDOW6j%E5o7*{p8V~<;z=Nyq|HGn@d%4NS>4Jt3
+zMaxY87kyIgp}dhqUe5Efen|aJd~UIgn>F_gW#{^5ufJq*LvB2PR+%0iL0vBzs*Rv$
+zM9Pp<3)REQ(9Xtlf|z(TyC?|Ml8K-q6v!*<a~>Y~hV85L`GKw&b}s@;J6*e0qcL?N
+z8n&mr>kJ44t&tA0TBY#NN;iwhAOtmRr3dgeCx(SBj+O`dw=}6JxI`_6ajY=uObZMy
+zHZ$H4uOfOiRE1Gr)Rdn|Rjb6k(s8{qIclgf-F2a=th}DMfeigix=HQb`Jl}Vu}y3S
+z5+3F-&i651Ei2-fz6@wMA%kqD3lGmTHhHlOM{a>I7xR&4YWX6{AE~kc!wx|VdtvdP
+zv_oz|;Xq9hrNAANis+Yo%o5M(4<D>pozs~J2O@H`7uH!F?O@)nD0C~+_%&~PV<O;h
+zRxJggTXl_|Z{l`(+I$yNLHX2h?Nh~ra_5ON!7M;!^|BFN{i?5M(k5qSPn~e`QF=0d
+zZi}Sm*)CdQqI=vr7{L-`(Ss2iwRCbIw7^{nt92&@1x@W+s5TAC;{e=9F5FdO$kkpV
+zUW0q#;IYd0897)Hq&&%SJ8&}=pu5%n>&Q0P6I;$${<j_S<w)d+6^5K|nLWwV`o}?X
+e^P-nZNd|@`7r&!8*6amoB%~m;$e>D9jmS?ch$lM$
+
+literal 0
+HcmV?d00001
+
+diff --git a/packages/termux-licenses/LICENSES/AGPL-3.0-only.txt b/packages/rslvd-licenses/LICENSES/AGPL-3.0-only.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/AGPL-3.0-only.txt
+rename to packages/rslvd-licenses/LICENSES/AGPL-3.0-only.txt
+diff --git a/packages/termux-licenses/LICENSES/AGPL-3.0-or-later.txt b/packages/rslvd-licenses/LICENSES/AGPL-3.0-or-later.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/AGPL-3.0-or-later.txt
+rename to packages/rslvd-licenses/LICENSES/AGPL-3.0-or-later.txt
+diff --git a/packages/termux-licenses/LICENSES/AGPL-3.0.txt b/packages/rslvd-licenses/LICENSES/AGPL-3.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/AGPL-3.0.txt
+rename to packages/rslvd-licenses/LICENSES/AGPL-3.0.txt
+diff --git a/packages/termux-licenses/LICENSES/Apache-2.0.txt b/packages/rslvd-licenses/LICENSES/Apache-2.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/Apache-2.0.txt
+rename to packages/rslvd-licenses/LICENSES/Apache-2.0.txt
+diff --git a/packages/termux-licenses/LICENSES/Artistic-License-2.0.txt b/packages/rslvd-licenses/LICENSES/Artistic-License-2.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/Artistic-License-2.0.txt
+rename to packages/rslvd-licenses/LICENSES/Artistic-License-2.0.txt
+diff --git a/packages/termux-licenses/LICENSES/BSL-1.0.txt b/packages/rslvd-licenses/LICENSES/BSL-1.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/BSL-1.0.txt
+rename to packages/rslvd-licenses/LICENSES/BSL-1.0.txt
+diff --git a/packages/termux-licenses/LICENSES/CC0-1.0.txt b/packages/rslvd-licenses/LICENSES/CC0-1.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/CC0-1.0.txt
+rename to packages/rslvd-licenses/LICENSES/CC0-1.0.txt
+diff --git a/packages/termux-licenses/LICENSES/CeCILL-2.1.txt b/packages/rslvd-licenses/LICENSES/CeCILL-2.1.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/CeCILL-2.1.txt
+rename to packages/rslvd-licenses/LICENSES/CeCILL-2.1.txt
+diff --git a/packages/termux-licenses/LICENSES/EPL-1.0.txt b/packages/rslvd-licenses/LICENSES/EPL-1.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/EPL-1.0.txt
+rename to packages/rslvd-licenses/LICENSES/EPL-1.0.txt
+diff --git a/packages/termux-licenses/LICENSES/EPL-2.0.txt b/packages/rslvd-licenses/LICENSES/EPL-2.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/EPL-2.0.txt
+rename to packages/rslvd-licenses/LICENSES/EPL-2.0.txt
+diff --git a/packages/termux-licenses/LICENSES/GPL-2.0-only.txt b/packages/rslvd-licenses/LICENSES/GPL-2.0-only.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/GPL-2.0-only.txt
+rename to packages/rslvd-licenses/LICENSES/GPL-2.0-only.txt
+diff --git a/packages/termux-licenses/LICENSES/GPL-2.0-or-later.txt b/packages/rslvd-licenses/LICENSES/GPL-2.0-or-later.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/GPL-2.0-or-later.txt
+rename to packages/rslvd-licenses/LICENSES/GPL-2.0-or-later.txt
+diff --git a/packages/termux-licenses/LICENSES/GPL-2.0.txt b/packages/rslvd-licenses/LICENSES/GPL-2.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/GPL-2.0.txt
+rename to packages/rslvd-licenses/LICENSES/GPL-2.0.txt
+diff --git a/packages/termux-licenses/LICENSES/GPL-3.0-only.txt b/packages/rslvd-licenses/LICENSES/GPL-3.0-only.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/GPL-3.0-only.txt
+rename to packages/rslvd-licenses/LICENSES/GPL-3.0-only.txt
+diff --git a/packages/termux-licenses/LICENSES/GPL-3.0-or-later.txt b/packages/rslvd-licenses/LICENSES/GPL-3.0-or-later.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/GPL-3.0-or-later.txt
+rename to packages/rslvd-licenses/LICENSES/GPL-3.0-or-later.txt
+diff --git a/packages/termux-licenses/LICENSES/GPL-3.0.txt b/packages/rslvd-licenses/LICENSES/GPL-3.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/GPL-3.0.txt
+rename to packages/rslvd-licenses/LICENSES/GPL-3.0.txt
+diff --git a/packages/termux-licenses/LICENSES/ISC.txt b/packages/rslvd-licenses/LICENSES/ISC.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/ISC.txt
+rename to packages/rslvd-licenses/LICENSES/ISC.txt
+diff --git a/packages/termux-licenses/LICENSES/ImageMagick.txt b/packages/rslvd-licenses/LICENSES/ImageMagick.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/ImageMagick.txt
+rename to packages/rslvd-licenses/LICENSES/ImageMagick.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-2.0-only.txt b/packages/rslvd-licenses/LICENSES/LGPL-2.0-only.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-2.0-only.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-2.0-only.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-2.0-or-later.txt b/packages/rslvd-licenses/LICENSES/LGPL-2.0-or-later.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-2.0-or-later.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-2.0-or-later.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-2.0.txt b/packages/rslvd-licenses/LICENSES/LGPL-2.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-2.0.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-2.0.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-2.1-only.txt b/packages/rslvd-licenses/LICENSES/LGPL-2.1-only.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-2.1-only.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-2.1-only.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-2.1-or-later.txt b/packages/rslvd-licenses/LICENSES/LGPL-2.1-or-later.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-2.1-or-later.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-2.1-or-later.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-2.1.txt b/packages/rslvd-licenses/LICENSES/LGPL-2.1.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-2.1.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-2.1.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-3.0-only.txt b/packages/rslvd-licenses/LICENSES/LGPL-3.0-only.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-3.0-only.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-3.0-only.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-3.0-or-later.txt b/packages/rslvd-licenses/LICENSES/LGPL-3.0-or-later.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-3.0-or-later.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-3.0-or-later.txt
+diff --git a/packages/termux-licenses/LICENSES/LGPL-3.0.txt b/packages/rslvd-licenses/LICENSES/LGPL-3.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/LGPL-3.0.txt
+rename to packages/rslvd-licenses/LICENSES/LGPL-3.0.txt
+diff --git a/packages/termux-licenses/LICENSES/MPL-2.0.txt b/packages/rslvd-licenses/LICENSES/MPL-2.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/MPL-2.0.txt
+rename to packages/rslvd-licenses/LICENSES/MPL-2.0.txt
+diff --git a/packages/termux-licenses/LICENSES/NCSA.txt b/packages/rslvd-licenses/LICENSES/NCSA.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/NCSA.txt
+rename to packages/rslvd-licenses/LICENSES/NCSA.txt
+diff --git a/packages/termux-licenses/LICENSES/Nethack.txt b/packages/rslvd-licenses/LICENSES/Nethack.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/Nethack.txt
+rename to packages/rslvd-licenses/LICENSES/Nethack.txt
+diff --git a/packages/termux-licenses/LICENSES/OpenLDAP.txt b/packages/rslvd-licenses/LICENSES/OpenLDAP.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/OpenLDAP.txt
+rename to packages/rslvd-licenses/LICENSES/OpenLDAP.txt
+diff --git a/packages/termux-licenses/LICENSES/PHP-3.0.txt b/packages/rslvd-licenses/LICENSES/PHP-3.0.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/PHP-3.0.txt
+rename to packages/rslvd-licenses/LICENSES/PHP-3.0.txt
+diff --git a/packages/termux-licenses/LICENSES/Public Domain.txt b/packages/rslvd-licenses/LICENSES/Public Domain.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/Public Domain.txt
+rename to packages/rslvd-licenses/LICENSES/Public Domain.txt
+diff --git a/packages/termux-licenses/LICENSES/Unlicense.txt b/packages/rslvd-licenses/LICENSES/Unlicense.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/Unlicense.txt
+rename to packages/rslvd-licenses/LICENSES/Unlicense.txt
+diff --git a/packages/termux-licenses/LICENSES/VIM License.txt b/packages/rslvd-licenses/LICENSES/VIM License.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/VIM License.txt
+rename to packages/rslvd-licenses/LICENSES/VIM License.txt
+diff --git a/packages/termux-licenses/LICENSES/WTFPL.txt b/packages/rslvd-licenses/LICENSES/WTFPL.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/WTFPL.txt
+rename to packages/rslvd-licenses/LICENSES/WTFPL.txt
+diff --git a/packages/termux-licenses/LICENSES/wxWindows.txt b/packages/rslvd-licenses/LICENSES/wxWindows.txt
+similarity index 100%
+rename from packages/termux-licenses/LICENSES/wxWindows.txt
+rename to packages/rslvd-licenses/LICENSES/wxWindows.txt
+diff --git a/packages/termux-licenses/build.sh b/packages/rslvd-licenses/build.sh
+similarity index 70%
+rename from packages/termux-licenses/build.sh
+rename to packages/rslvd-licenses/build.sh
+index 5978425..92d6f50 100644
+--- a/packages/termux-licenses/build.sh
++++ b/packages/rslvd-licenses/build.sh
+@@ -1,5 +1,5 @@
+-TERMUX_PKG_HOMEPAGE=https://termux.dev
+-TERMUX_PKG_DESCRIPTION="Contains LICENSE files for common licenses"
++TERMUX_PKG_HOMEPAGE=https://rslvd.net
++TERMUX_PKG_DESCRIPTION="Contains LICENSE files for common licenses (rslvd build of termux-licenses)"
+ TERMUX_PKG_LICENSE="GPL-3.0"
+ TERMUX_PKG_MAINTAINER="@termux"
+ TERMUX_PKG_VERSION=2.2
+@@ -7,6 +7,9 @@ TERMUX_PKG_AUTO_UPDATE=false
+ TERMUX_PKG_SKIP_SRC_EXTRACT=true
+ TERMUX_PKG_PLATFORM_INDEPENDENT=true
+ TERMUX_PKG_ESSENTIAL=true
++TERMUX_PKG_PROVIDES="termux-licenses (= 2.2)"
++TERMUX_PKG_REPLACES="termux-licenses"
++TERMUX_PKG_CONFLICTS="termux-licenses"
+ 
+ termux_step_make_install() {
+ 	mkdir -p "$TERMUX_PREFIX/share/LICENSES"
+diff --git a/packages/rslvd-tools/build.sh b/packages/rslvd-tools/build.sh
+new file mode 100644
+index 0000000..9d0924a
+--- /dev/null
++++ b/packages/rslvd-tools/build.sh
+@@ -0,0 +1,77 @@
++TERMUX_PKG_HOMEPAGE=https://rslvd.net/
++TERMUX_PKG_DESCRIPTION="Basic system tools for the rslvd shell (rslvd build of termux-tools)"
++TERMUX_PKG_LICENSE="GPL-3.0"
++TERMUX_PKG_MAINTAINER="@termux"
++TERMUX_PKG_VERSION="1.46.0+really1.45.0"
++TERMUX_PKG_REVISION=4
++TERMUX_PKG_SRCURL=https://github.com/termux/termux-tools/archive/refs/tags/v1.45.0.tar.gz
++TERMUX_PKG_SHA256=1ae29b1b875d95cc626dae323b45a2ace759969862d96094b2fa6d13bffe20d2
++TERMUX_PKG_ESSENTIAL=true
++#TERMUX_PKG_AUTO_UPDATE=true
++TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
++TERMUX_PKG_BREAKS="termux-keyring (<< 1.9)"
++TERMUX_PKG_PROVIDES="termux-tools (= 1.46.0+really1.45.0-4)"
++TERMUX_PKG_REPLACES="termux-tools"
++TERMUX_PKG_CONFLICTS="termux-tools, procps (<< 3.3.15-2)"
++source "$TERMUX_SCRIPTDIR/scripts/rslvd_rebrand.sh"
++
++# Some of these packages are not dependencies and used only to ensure
++# that core packages are installed after upgrading (we removed busybox
++# from essentials).
++TERMUX_PKG_DEPENDS="bzip2, coreutils, curl, dash, diffutils, findutils, gawk, grep, gzip, less, procps, psmisc, sed, tar, rslvd-am (>= 0.8.0), rslvd-am-socket (>= 1.5.0), rslvd-core, rslvd-exec, rslvd-keyring, util-linux, xz-utils, dialog"
++
++# Optional packages that are distributed as part of bootstrap archives.
++TERMUX_PKG_RECOMMENDS="ed, dos2unix, inetutils, net-tools, patch, unzip"
++
++termux_step_pre_configure() {
++	autoreconf -vfi
++	# configure.ac falls back to com.termux unless these are in the environment.
++	export TERMUX_APP_PACKAGE TERMUX_BASE_DIR TERMUX_CACHE_DIR TERMUX_PREFIX TERMUX_ANDROID_HOME
++}
++
++termux_step_post_make_install() {
++	TERMUX_PKG_CONFFILES="$(cat "$TERMUX_PKG_BUILDDIR/conffiles")"
++
++	# Only repo.rslvd.net serves packages built for this prefix: drop the
++	# Termux mirror list so `pkg` never rotates sources.list onto a Termux mirror.
++	local mirrors="$TERMUX_PREFIX/etc/termux/mirrors"
++	rm -rf "$mirrors"
++	mkdir -p "$mirrors"/{asia,chinese_mainland,europe,north_america,oceania,russia}
++	cat > "$mirrors/default" <<-EOF
++	# This file is sourced by pkg
++	# rslvd package repository (packages built for $TERMUX_PREFIX)
++	WEIGHT=10
++	MAIN="https://repo.rslvd.net/apt/rslvd-main"
++	EOF
++	ln -sf "$mirrors/default" "$TERMUX_PREFIX/etc/termux/chosen_mirrors"
++
++	# Termux Play Store deprecation notice does not apply to rslvd.
++	rm -f "$TERMUX_PREFIX/etc/motd-playstore"
++	cat > "$TERMUX_PREFIX/etc/motd" <<-EOF
++	Welcome to the rslvd shell!
++
++	Dashboard:  https://rslvd.net
++	Packages:   https://repo.rslvd.net
++
++	Working with packages:
++
++	 - Search:  pkg search <query>
++	 - Install: pkg install <package>
++	 - Upgrade: pkg upgrade
++
++	Run 'rslvd-info' to print environment details for support tickets.
++	EOF
++}
++
++termux_step_post_massage() {
++	rslvd_rebrand_bins
++	rslvd_rebrand_replace_string "/data/data/com.termux" "$TERMUX_APP__DATA_DIR"
++	rslvd_rebrand_replace_string "libexec/termux-am/" "libexec/rslvd-am/"
++	rslvd_rebrand_replace_string "cache/termux-am" "cache/rslvd-am"
++}
++
++termux_step_create_debscripts() {
++	cat <<- EOF > ./preinst
++	$(cat "$TERMUX_PKG_BUILDDIR/preinst")
++	EOF
++}
+diff --git a/packages/termux-am-socket/build.sh b/packages/termux-am-socket/build.sh
+deleted file mode 100644
+index 30c44d3..0000000
+--- a/packages/termux-am-socket/build.sh
++++ /dev/null
+@@ -1,20 +0,0 @@
+-TERMUX_PKG_HOMEPAGE=https://github.com/termux/termux-am-socket
+-TERMUX_PKG_DESCRIPTION="A faster version of am with less features that only works while Termux is running"
+-TERMUX_PKG_LICENSE="GPL-3.0"
+-TERMUX_PKG_MAINTAINER="@termux"
+-TERMUX_PKG_VERSION=1.5.0
+-TERMUX_PKG_REVISION=1
+-TERMUX_PKG_SRCURL=https://github.com/termux/termux-am-socket/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
+-TERMUX_PKG_SHA256=5175023c7fd675492451a72d06b75c772f257685b69fe117227bae5a5e6f5494
+-TERMUX_PKG_DEPENDS="libc++"
+-
+-termux_step_post_get_source() {
+-
+-	for file in "${TERMUX_PKG_SRCDIR}/"*; do
+-		sed -i'' -E -e "s|^(TERMUX_AM_SOCKET_VERSION=).*|\1$TERMUX_PKG_FULLVERSION|" \
+-			-e "s|\@TERMUX_APP_PACKAGE\@|${TERMUX_APP_PACKAGE}|g" \
+-			-e "s|\@TERMUX_APPS_DIR\@|${TERMUX_APPS_DIR}|g" \
+-			"$file"
+-	done
+-
+-}
+diff --git a/packages/termux-keyring/2096779623.gpg b/packages/termux-keyring/2096779623.gpg
+deleted file mode 100644
+index 95d9781b3f8d06dd71769e3cc5a3f36ea61c9efe..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 2879
+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
+
+diff --git a/packages/termux-keyring/agnostic-apollo.gpg b/packages/termux-keyring/agnostic-apollo.gpg
+deleted file mode 100644
+index 2ad4eeda5d3ba72f0bed54eb11de257cf181a396..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 4716
+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
+
+diff --git a/packages/termux-keyring/build.sh b/packages/termux-keyring/build.sh
+deleted file mode 100644
+index 194eb3d..0000000
+--- a/packages/termux-keyring/build.sh
++++ /dev/null
+@@ -1,60 +0,0 @@
+-TERMUX_PKG_HOMEPAGE=https://github.com/termux
+-TERMUX_PKG_DESCRIPTION="GPG public keys for the official Termux repositories"
+-TERMUX_PKG_LICENSE="Apache-2.0"
+-TERMUX_PKG_MAINTAINER="@termux"
+-TERMUX_PKG_VERSION=3.14
+-TERMUX_PKG_AUTO_UPDATE=false
+-TERMUX_PKG_SKIP_SRC_EXTRACT=true
+-TERMUX_PKG_PLATFORM_INDEPENDENT=true
+-TERMUX_PKG_ESSENTIAL=true
+-
+-termux_step_make_install() {
+-	local GPG_SHARE_DIR="$TERMUX_PREFIX/share/termux-keyring"
+-
+-	# Delete all existing termux-keyring keys
+-	rm -rf "$GPG_SHARE_DIR"
+-	mkdir -p "$GPG_SHARE_DIR"
+-
+-	# Maintainer-specific keys.
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/agnostic-apollo.gpg" "$GPG_SHARE_DIR"
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/grimler.gpg" "$GPG_SHARE_DIR"
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/kcubeterm.gpg" "$GPG_SHARE_DIR"
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/landfillbaby.gpg" "$GPG_SHARE_DIR"
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/mradityaalok.gpg" "$GPG_SHARE_DIR"
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/2096779623.gpg" "$GPG_SHARE_DIR"
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/thunder-coding.gpg" "$GPG_SHARE_DIR"
+-
+-	# Key for automatic builds (via CI).
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/termux-autobuilds.gpg" "$GPG_SHARE_DIR"
+-
+-	# Key for pacman package manager.
+-	install -Dm600 "$TERMUX_PKG_BUILDER_DIR/termux-pacman.gpg" "$GPG_SHARE_DIR"
+-
+-	# Create symlinks under all GPG_DIRs to key files under GPG_SHARE_DIR
+-	for GPG_DIR in "$TERMUX_PREFIX/etc/apt/trusted.gpg.d" "$TERMUX_PREFIX/share/pacman/keyrings"; do
+-		mkdir -p "$GPG_DIR"
+-		# Delete keys which have been removed in newer version and their symlink target does not exist
+-		find "$GPG_DIR" -xtype l -printf 'Deleting removed key: %p\n' -delete
+-		for GPG_FILE in "$GPG_SHARE_DIR"/*.gpg; do
+-			if [[ "$GPG_DIR" == *"/apt/"* && "$GPG_FILE" == *"termux-pacman.gpg"* ]]; then
+-				continue
+-			fi
+-			# Create or overwrite key symlink
+-			ln -sf "$GPG_FILE" "$GPG_DIR/$(basename "$GPG_FILE")"
+-		done
+-		# Creation of trusted files
+-		if [[ "$GPG_DIR" == *"/pacman/"* ]]; then
+-			echo "998DE27318E867EA976BA877389CEED64573DFCA:4:" > "$GPG_DIR/termux-pacman-trusted"
+-		fi
+-	done
+-}
+-
+-termux_step_create_debscripts() {
+-	if [ "$TERMUX_PACKAGE_FORMAT" = "pacman" ]; then
+-		echo "if [ ! -d $TERMUX_PREFIX/etc/pacman.d/gnupg/ ]; then" > postupg
+-		echo "  pacman-key --init" >> postupg
+-		echo "fi" >> postupg
+-		echo "pacman-key --populate" >> postupg
+-		echo "post_upgrade" > postinst
+-	fi
+-}
+diff --git a/packages/termux-keyring/grimler.gpg b/packages/termux-keyring/grimler.gpg
+deleted file mode 100644
+index b681819339118aa488dec7a16a54e72c6b630e4e..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 19990
+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
+btuwyLfnriW>tCO|z1Xp7QgxPS=<|mFD$)>8
+
+diff --git a/packages/termux-keyring/kcubeterm.gpg b/packages/termux-keyring/kcubeterm.gpg
+deleted file mode 100644
+index 69c7cabd56650cab65abca429a8508a09418c0ad..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 2961
+zcmYk8cRUmhAII;`*@wfK8HemME6$25enR$0nTNB-ITTT6b4rTrnQ``LTq!dvt3#bi
+z*%di^oEbg!dtSYs=ikqt@7MeLeZ6ymY+%=PmJ%Qn;JNf&a9LT*WP}Qia9Z)gXErnO
+zHL+zFQiHlSrEa^Q8^0l1_%z7Hko&2EMOobJ1&%Jq=?Xn>g`xLX-`zK!HN<FhsClW&
+zB))VF{{o$nKDzi4TG-_KOvax$btG!EK6!P1;!Ez`oF@e_tDfnCVy@&VGl?tIG>EN+
+zab8)T_l>!Xlut9K$BWcsxGG*NEpUz~Gsz%y1OWxa&9Vx)vo98%1o7fzT=@+h$l+#+
+zR)g_dlkB%?#Ca`ljJ+QKIlW1?X2^*;>lvgrN7VgFTVhO|DGTrge)azca@)JtXugWN
+zw>CZ>%33nYs|o6+I38W%j}=M6=C!dCj@T57!vLH>0PvZn3C<_PI}i=`LkD`JeIn3s
+znJehPP<Ut%Jm^LsJOGUgQIv&i`?-g?VL~yu06nh&w2!}{dr-i60uTx2{tZ%`9`pw(
+z=oB3TD>D-#9f*O43B=683g!jT0YM@_5MMNag&7)j>yrbfw_>`of(cNwXZ4PlcrPWp
+z9*GPUwIx0JQG;sa0BFV<pV1e-{<b2E(=|jfUv5X{m0{I6>!vRIAgW8;fV2C~fn~!Q
+zG;F_f9mLpT6kyhrd;sENPu8s3T!^$NRqj8|v5%&WOY+4@l6^$&%CO<sY4?PfO|m<$
+zU>9j+>e`auNv!g!^LYhczAOcd*4XF`HA>Dil3u)UAp+X;RL2v2whj4EmGiXA&5%@z
+z5ZfHiqJH?>AzR7Ex)t~bQlp5&&kuAM-~3OHM&CRsy8W5+!~DHE9?iPSjz}{bX)E3J
+zc13@sfvYdLLsTyY{oo0ZskA@SKyk5gM-g2pG7G-pnpP*Q_0ALm=nNPNWB~~Cih;HK
+zY*MD3%i7*+uWcA?Wua7Uu4MiunwJ&vhuYsoBb(z_Fssz6Ph99&-SAG)w)TSn2lmL3
+z=z?g@h9ny7s>#!IiN>wcR^%AbZ1F;`aX{1M?8M?%!;t+oSGepPo8G$H?#SsdRJJii
+zxecTBIT6)uoLp+BO_dt)Gs$7D93lYL`BX09a{XXBVUbuYBzvs*>7AJgEwb7-lUka-
+zMwPp0P4t;65~dkeOH;ug4>c5t&}Zs&secmBh>2dLlZEA$j5r{umrtL2fA77sldF8)
+z%7Th&=DmsS6$`bpcf!uM6Uq~%b{6Ecb<DIEK8$!2qQs1{?e+5(cf}^CC58+v1|s@l
+zN3ITn=V!W=9wglJgzz2}-V*z=IA%)MBN@y7q?UV%Z@0R&SwI5s__N9g?IuEX!O16G
+zn=bHg4w9YzaKR-_cEH0pw^|o_xEJywc^T-Wok&jsiyktAq@Yz+!4p5T<x`^`JYSB+
+zDW1fA>}f7}EYF9`sWu_+ZImfSI(|xLcHl8qGnk&|6hd!1=#L9@l<4_He9z%is^N&}
+z$G>16$5UQE<72iRN_-n9m^`~J;B<wPa7t^r?9#xqI7BX#q2Dda(aX9D>;<ta>mRMI
+zW=Q*#5>C4bYr1O@%jo%Q{a_(9DN}&p)Gh~+hQM(kIeW0T`Xc)}j(c77;oMAH9T87F
+z?Z4twZ_v$pbT;#pdlPNicQ#|Gw~$Hz{;`JXUu&MLc)J!QYYaZHAS+C)k9$9O(qi$)
+zno*5E*8E*Eb(sK}m>sKY^fLZh(WIEAx@mJZIKH$buz!W2nhXxKYRtqJ$bPO?srN`a
+zPDnrT@VKf0Z=<O5uP47Sof}{m;7o<i9+9L<47w?gH;rjB2mq*vvO3W5ym`&9(cxpH
+zxS5&6te~86*v69|h@kc_T+?y=g`Bn1bVmp06PHVwA9iYiR;6T`Nu3Dc<xn45Vml>P
+znTfNhLqeCnqsiK`p?qZm9h#W2AO2{qC@s`SC;z$%i$pyv4Y<AKF$fEv#S1Kd1E154
+zijeTSW58kg87m!v@949u-P%bc^%!8|JVmRFtmKc}g<X<m76dO0S=t?{?}EoHZYCox
+zb0ZsU>HeP@0x#Q;O%U}EsGfh@#29GA8jSX%2cfkdVg6A2yZG2L{<6gCb_x4)eQ!4p
+z_(1*W{Vw>m?tw0c$7F1Mv(@o1Pz>vIca}YGODlA8mCpF0!2nxmLzCG19HY^1=U=1k
+z6<AEG-=rz$dFuEIn4&2)GW6IBDvDebwtXq%R2K7GGY0oJSIS=~d8|%d%4v}Tn_r9w
+z^CxfZCn2gvzuKyEby67))!SU7JtQkdKf^8&UP?_#xz*Ki3Df|(pdK5w<)otvpOSSP
+z5tUwZ<c*tZ4_+giDV)!<2@rJTicrx*P<f)4D!uNO2w?x?)#$-H1=6<`EN5);aHy5X
+z){bt5jD{@*;Iq&$evq37!Th-l*?Q~pVKC_n;u^iF>0%>hF8{wD>c6fH<3{dOemMlj
+zCfx#GBizdR9<>Fb2f1}}nE#>ncS+IXIMEuUCGj=CdMUsqmHnaq@L@L}@=Ji8r0A>o
+zqOXJWsPGk?@Amn1f$d`l<b%gFO<`5&Z4GtXDIw|`_|DK=7-=c4farne=Jx9-(=S%h
+z<T5!Y9oY2gLm-|k5U{&LzxgW>(kw3u>}>U6s6*a?vF6*vmggi}2lfiNuknUEFJwtL
+z`aY8{jPjItFlyKQrExOe4-Ok=;fG)e2pLZssjwOXcUet9`1KL(kgJTsu|HPUf#1Y-
+zO&MMyCF{Pa^_B|BZF$USPT$r8*PcS<JCL5*6hb2t?D7k685q<v>!WW=+oE1>VTrC+
+z#B8dP4k{;jg)-ApoCHur6tbr?0bUvtAQ>p=Hyi&w-BMu1;ir%2<08$W6^ZrBlM1Xm
+zZLBa?K{wbEIYpx&<N_OE^130AF*xIm(c~(h?eRGW97<K=g${IIpm-)jr`R^qx6z<y
+zFE}E$t(5jd<nT6K&Zt)!bC1!WZB5O&Y~80DXgT|dLd(|ACUg9EUh!}->2wA2a$!hY
+zdQUvVg?axe+fNhcPr$C(Y={?~6c!t01YZof+_3{#>$B)5Y%(Qzfk0vN7A?K=an)7I
+zJw3hFG<~O@d7MeBf=Z^T?x;xW{q>3deLvUjQMF*DQzEA-Z(%h?%o6Uh)$MldRkBfV
+z!zRiGuuDF6kl^Lr5JE-Po0tE~t5Mn1_xj>9b~)Yd@`GMfQ%4>{bv}}y<uzi5Hqhh1
+zT=2Y(`3<VyLavNN3SD1^r`!_TYRWa!+UmYv--T5YGhi;gh;l1^K54DxwMT1s>Bmv3
+zZWf@>sHZU3`v!$u*rq<XsZh;*|Be88T@<O-5jA8rW1A9x`~Vd(Mf=Eyh%zphNEO^$
+zkr;?KFx>*?AVjiW2ff!%W^20M*`4P8>fRM|4$ezC@faE%koXmo-{RW`#fDgeHfUDq
+z2X`51{2Ibf7VF78{Qk`i0>{J_IDOOHO7-awq~P+fs{7tSW!R|xOMW$QVV>X8UjBFe
+zyGlG#15-pEDe%$R(QqH`fAfj}6b1AD{@Bca6AAL?V*Zv;LK5SNSWH!)7OoZ#ttvF$
+z=X$ndXW>o2zdxsI)atqjX&)aAMXAM(M53#%mL8jEr+52BOuoGJy8w4PJWTAfO7aA;
+zg+<E4&`0GunVM}D8!@V_2WbyiwlIUFSdlyI)4qVfG<%uvy<h!bpt|6I3gShllz>N_
+zQNd!2=Bd<+C-`(~ok%(ptinX`ABQcL5<{0OCGW<)Irp>jS^1cXAg_V>GsOvrk^S;^
+zyUEK0Z*S>RXUWPX&p}3};4#7TTERscG4Xq|$(b$G_8*gV+AUyNWNVF62fg`2vw===
+og_*w3l@80-e>oE8j968cx5x5+kd^MLZ`GZ;??PKF9#+!*56UrMZ2$lO
+
+diff --git a/packages/termux-keyring/landfillbaby.gpg b/packages/termux-keyring/landfillbaby.gpg
+deleted file mode 100644
+index b8d149ad7de2723a85dfdff5a9c2807c710aed30..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 4644
+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
+
+diff --git a/packages/termux-keyring/mradityaalok.gpg b/packages/termux-keyring/mradityaalok.gpg
+deleted file mode 100644
+index a4abdbb4b87fff23969e18e3ebb15e7edc739944..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 8188
+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
+Q@$1uoS|NVSe4Ir81=}F=0ssI2
+
+diff --git a/packages/termux-keyring/termux-autobuilds.gpg b/packages/termux-keyring/termux-autobuilds.gpg
+deleted file mode 100644
+index c5ed76a1b9a1f2bc2e296bdd5ca50cf1f1f12706..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 2458
+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
+
+diff --git a/packages/termux-keyring/termux-pacman.gpg b/packages/termux-keyring/termux-pacman.gpg
+deleted file mode 100644
+index d7e0ced082eb6e05945201c1fa511af66bb3a781..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 1765
+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
+H=~tng!uwyL
+
+diff --git a/packages/termux-keyring/thunder-coding.gpg b/packages/termux-keyring/thunder-coding.gpg
+deleted file mode 100644
+index 2d172a0e3982ab84db8ebe1c772d3a9b17b52ed7..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 622
+zcmbPX%#z{Fc}k2^n~jl$@s>M3BO|-R%k!(wh%Z{db8+**Wp;dZ3zy$m+RQj(n#KXE
+zBMzmpVN<p!M<!+$XDB!&7G+i@D%ezlcu7Exi9>pBVrGtBa(=E|$21mUF)ju>F-4Xs
+z0{)YugOfIk@@+r(_ol|pRD}XDRwj_WOw!D(oI+=q8CbbFIoO%lM7cOQxS3eQn3x%v
+z<QSR68yL7a1z=k4r!f4}lgWFdE^DVEoFw*Ob4AhfpdiJcr}DVu`qaK1J90KzjFI8>
+zoVjM5%Z@HleZ73T`&OZ6@lV&Dn_)cTp4F6ne^;(K$-PAb)$t`6rFki-MY_rPDVcfc
+z4kf8Yxuq3)DXC?|_<$>)Bp(PYV`S)mQpC%#`oo&WxITjpo_Rc9q)Y@1JQuf3G0$3;
+zeEdW>Bf}5XZ|(aRuIM^*aEi+c<Fc7ij%|JS#D3=Qs=n$Qa`6ts4hwLc32}krY<ego
+zD=5-b0^5(iPTp6_%C^8g^u(2FeYuvIc{_e?Jur82;q7^*G0cn{>>YJ162Lf7BM>J%
+zkT^jO`--Q)uosSW-!@(O+Ow4x=9@Zb+WYQZaQpXFJ?|hnt)r(Zb3GXuE~Gv9)icSq
+fqf2qtp0Ky3OQ%Vy?DctlPUzg8Q<rp4R<i*BqSxa}
+
+diff --git a/packages/termux-tools/build.sh b/packages/termux-tools/build.sh
+deleted file mode 100644
+index 9973785..0000000
+--- a/packages/termux-tools/build.sh
++++ /dev/null
+@@ -1,36 +0,0 @@
+-TERMUX_PKG_HOMEPAGE=https://termux.dev/
+-TERMUX_PKG_DESCRIPTION="Basic system tools for Termux"
+-TERMUX_PKG_LICENSE="GPL-3.0"
+-TERMUX_PKG_MAINTAINER="@termux"
+-TERMUX_PKG_VERSION="1.46.0+really1.45.0"
+-TERMUX_PKG_REVISION=1
+-TERMUX_PKG_SRCURL=https://github.com/termux/termux-tools/archive/refs/tags/v1.45.0.tar.gz
+-TERMUX_PKG_SHA256=1ae29b1b875d95cc626dae323b45a2ace759969862d96094b2fa6d13bffe20d2
+-TERMUX_PKG_ESSENTIAL=true
+-#TERMUX_PKG_AUTO_UPDATE=true
+-TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
+-TERMUX_PKG_BREAKS="termux-keyring (<< 1.9)"
+-TERMUX_PKG_CONFLICTS="procps (<< 3.3.15-2)"
+-TERMUX_PKG_SUGGESTS="termux-api"
+-
+-# Some of these packages are not dependencies and used only to ensure
+-# that core packages are installed after upgrading (we removed busybox
+-# from essentials).
+-TERMUX_PKG_DEPENDS="bzip2, coreutils, curl, dash, diffutils, findutils, gawk, grep, gzip, less, procps, psmisc, sed, tar, termux-am (>= 0.8.0), termux-am-socket (>= 1.5.0), termux-core, termux-exec, util-linux, xz-utils, dialog"
+-
+-# Optional packages that are distributed as part of bootstrap archives.
+-TERMUX_PKG_RECOMMENDS="ed, dos2unix, inetutils, net-tools, patch, unzip"
+-
+-termux_step_pre_configure() {
+-	autoreconf -vfi
+-}
+-
+-termux_step_post_make_install() {
+-	TERMUX_PKG_CONFFILES="$(cat "$TERMUX_PKG_BUILDDIR/conffiles")"
+-}
+-
+-termux_step_create_debscripts() {
+-	cat <<- EOF > ./preinst
+-	$(cat "$TERMUX_PKG_BUILDDIR/preinst")
+-	EOF
+-}
+diff --git a/packages/tsu/build.sh b/packages/tsu/build.sh
+index a891b3a..0e718ed 100644
+--- a/packages/tsu/build.sh
++++ b/packages/tsu/build.sh
+@@ -1,14 +1,15 @@
+ TERMUX_PKG_HOMEPAGE=https://github.com/cswl/tsu
+-TERMUX_PKG_DESCRIPTION="A su wrapper for Termux"
++TERMUX_PKG_DESCRIPTION="A su wrapper for the rslvd shell (requires a rooted device: Magisk/KernelSU su binary)"
+ TERMUX_PKG_LICENSE="ISC"
+ TERMUX_PKG_MAINTAINER="@termux"
+ TERMUX_PKG_VERSION=8.6.0
+-TERMUX_PKG_REVISION=1
++TERMUX_PKG_REVISION=2
+ _COMMIT=800b448becafb0186eecc366c50442ed9f8bb944
+ TERMUX_PKG_PLATFORM_INDEPENDENT=true
+ TERMUX_PKG_BUILD_IN_SRC=true
+ TERMUX_PKG_SRCURL=git+https://github.com/cswl/tsu
+ TERMUX_PKG_GIT_BRANCH=v8
++source "$TERMUX_SCRIPTDIR/scripts/rslvd_rebrand.sh"
+ 
+ termux_step_post_get_source() {
+ 	git fetch --unshallow
+@@ -26,3 +27,7 @@ termux_step_make_install() {
+ 	# sudo - is an included addon in tsu now
+ 	ln -sf "$TERMUX_PREFIX/bin/tsu" "$TERMUX_PREFIX/bin/sudo"
+ }
++
++termux_step_post_massage() {
++	rslvd_rebrand_replace_string "/data/data/com.termux" "$TERMUX_APP__DATA_DIR"
++}
+diff --git a/scripts/build/termux_step_install_license.sh b/scripts/build/termux_step_install_license.sh
+index e9abeee..15354d9 100644
+--- a/scripts/build/termux_step_install_license.sh
++++ b/scripts/build/termux_step_install_license.sh
+@@ -102,9 +102,9 @@ termux_step_install_license() {
+ 					fi
+ 				;;
+ 				*) # For the rest we can use a link to the generic license file
+-					[[ -f "$TERMUX_SCRIPTDIR/packages/termux-licenses/LICENSES/${LICENSE}.txt" ]] || {
++					[[ -f "$TERMUX_SCRIPTDIR/packages/rslvd-licenses/LICENSES/${LICENSE}.txt" ]] || {
+ 						# If we get here, no license file could be found
+-						termux_error_exit "${TERMUX_PKG_NAME}: Could not find a license file for $LICENSE in packages/termux-licenses"
++						termux_error_exit "${TERMUX_PKG_NAME}: Could not find a license file for $LICENSE in packages/rslvd-licenses"
+ 					}
+ 					# the link target depends on the libc being used
+ 					case "$TERMUX_PACKAGE_LIBRARY" in
+diff --git a/scripts/build/toolchain/termux_setup_toolchain_29.sh b/scripts/build/toolchain/termux_setup_toolchain_29.sh
+index 27abb3e..38f6fda 100644
+--- a/scripts/build/toolchain/termux_setup_toolchain_29.sh
++++ b/scripts/build/toolchain/termux_setup_toolchain_29.sh
+@@ -133,12 +133,9 @@ termux_setup_toolchain_29() {
+ 	[ -d "${TERMUX_STANDALONE_TOOLCHAIN}-work" ] || mkdir -p "${TERMUX_STANDALONE_TOOLCHAIN}-work"
+ 
+ 
+-	if ! mountpoint -q "${TERMUX_STANDALONE_TOOLCHAIN}"; then
+-		fuse-overlayfs \
+-			"${TERMUX_STANDALONE_TOOLCHAIN}" \
+-			-o lowerdir="${NDK}/toolchains/llvm/prebuilt/linux-x86_64" \
+-			-o upperdir="${TERMUX_STANDALONE_TOOLCHAIN}-upper" \
+-			-o workdir="${TERMUX_STANDALONE_TOOLCHAIN}-work"
++	if [ ! -e "${TERMUX_STANDALONE_TOOLCHAIN}/.termux-toolchain-copied" ]; then
++		cp -a "${NDK}/toolchains/llvm/prebuilt/linux-x86_64/." "${TERMUX_STANDALONE_TOOLCHAIN}/"
++		touch "${TERMUX_STANDALONE_TOOLCHAIN}/.termux-toolchain-copied"
+ 	fi
+ 
+ 	if [ -f "${TERMUX_STANDALONE_TOOLCHAIN}/.termux-standalone-toolchain" ]; then
+diff --git a/scripts/buildorder.py b/scripts/buildorder.py
+index 74a2392..495e1ae 100755
+--- a/scripts/buildorder.py
++++ b/scripts/buildorder.py
+@@ -65,6 +65,21 @@ def parse_build_file_dependencies(path):
+     "Extract the dependencies of a build.sh or *.subpackage.sh file."
+     return parse_build_file_dependencies_with_vars(path, ('TERMUX_PKG_DEPENDS', 'TERMUX_PKG_BUILD_DEPENDS', 'TERMUX_SUBPKG_DEPENDS', 'TERMUX_PKG_DEVPACKAGE_DEPENDS'))
+ 
++def parse_build_file_provides(path):
++    "Extract the virtual package names from TERMUX_PKG_PROVIDES of a build.sh file."
++    provides = []
++
++    with open(path, encoding="utf-8") as build_script:
++        for line in build_script:
++            if line.startswith('TERMUX_PKG_PROVIDES'):
++                provides_string = remove_nl_and_quotes(line.split('PROVIDES=')[1])
++                for provided_value in re.split(',', provides_string):
++                    provided_value = re.sub(r'\(.*?\)', '', provided_value).strip()
++                    if provided_value:
++                        provides.append(provided_value)
++
++    return set(provides)
++
+ def parse_build_file_antidependencies(path):
+     "Extract the antidependencies of a build.sh file."
+     return parse_build_file_dependencies_with_vars(path, 'TERMUX_PKG_ANTI_BUILD_DEPENDS')
+@@ -119,6 +134,7 @@ class TermuxPackage(object):
+             raise Exception("build.sh not found for package '" + self.name + "'")
+ 
+         self.deps = parse_build_file_dependencies(build_sh_path)
++        self.provides = parse_build_file_provides(build_sh_path)
+         self.antideps = parse_build_file_antidependencies(build_sh_path)
+         self.excluded_arches = parse_build_file_excluded_arches(build_sh_path)
+         self.only_installing = parse_build_file_variable_bool(build_sh_path, 'TERMUX_PKG_ONLY_INSTALLING')
+@@ -261,6 +277,13 @@ def read_packages_from_directories(directories, fast_build_mode, full_buildmode)
+                         pkgs_map[subpkg.name] = new_package
+                     all_packages.append(subpkg)
+ 
++    # Virtual packages (TERMUX_PKG_PROVIDES) resolve to their provider when no
++    # real package of that name exists.
++    for pkg in all_packages:
++        if isinstance(pkg, TermuxPackage):
++            for provided_name in pkg.provides:
++                pkgs_map.setdefault(provided_name, pkg)
++
+     for pkg in all_packages:
+         for dependency_name in pkg.deps:
+             if dependency_name not in pkgs_map:
+diff --git a/scripts/generate-bootstraps.sh b/scripts/generate-bootstraps.sh
+index 186d8ee..692716a 100755
+--- a/scripts/generate-bootstraps.sh
++++ b/scripts/generate-bootstraps.sh
+@@ -76,6 +76,11 @@ read_package_list_deb() {
+ 				local package_name
+ 				package_name=$(echo "$package" | grep -i "^Package:" | awk '{ print $2 }')
+ 
++				local provided
++				for provided in $(echo "$package" | grep -i "^Provides:" | sed -E 's@^[Pp]rovides:@@; s@\([^)]*\)@@g' | tr ',' ' '); do
++					PACKAGE_PROVIDERS["$provided"]="$package_name"
++				done
++
+ 				if [ -z "${PACKAGE_METADATA["$package_name"]}" ]; then
+ 					PACKAGE_METADATA["$package_name"]="$package"
+ 				else
+@@ -115,7 +120,12 @@ print_desc_package_pac() {
+ # the bootstrap root.
+ pull_package() {
+ 	local package_name=$1
++	# Resolve virtual packages (e.g. termux-tools -> rslvd-tools) to their provider.
++	if [ ${TERMUX_PACKAGE_MANAGER} = "apt" ] && [ -z "${PACKAGE_METADATA[${package_name}]}" ] && [ -n "${PACKAGE_PROVIDERS[${package_name}]}" ]; then
++		package_name="${PACKAGE_PROVIDERS[${package_name}]}"
++	fi
+ 	local package_tmpdir="${BOOTSTRAP_PKGDIR}/${package_name}"
++	[ -e "$package_tmpdir/package.deb" ] && return 0
+ 	mkdir -p "$package_tmpdir"
+ 
+ 	if [ ${TERMUX_PACKAGE_MANAGER} = "apt" ]; then
+@@ -438,6 +448,7 @@ for package_arch in "${TERMUX_ARCHITECTURES[@]}"; do
+ 	# Read package metadata.
+ 	unset PACKAGE_METADATA
+ 	declare -A PACKAGE_METADATA
++	declare -A PACKAGE_PROVIDERS
+ 	if [ ${TERMUX_PACKAGE_MANAGER} = "apt" ]; then
+ 		read_package_list_deb "$package_arch"
+ 	else
+@@ -470,10 +481,10 @@ for package_arch in "${TERMUX_ARCHITECTURES[@]}"; do
+ 	pull_package psmisc
+ 	pull_package sed
+ 	pull_package tar
+-	pull_package termux-core
+-	pull_package termux-exec
+-	pull_package termux-keyring
+-	pull_package termux-tools
++	pull_package rslvd-core
++	pull_package rslvd-exec
++	pull_package rslvd-keyring
++	pull_package rslvd-tools
+ 	pull_package util-linux
+ 	pull_package xz-utils
+ 
+diff --git a/scripts/properties.sh b/scripts/properties.sh
+index ebaf323..0dda18c 100644
+--- a/scripts/properties.sh
++++ b/scripts/properties.sh
+@@ -371,7 +371,7 @@ fi
+ #
+ # Default value: `Termux`
+ ##
+-TERMUX__NAME="Termux"
++TERMUX__NAME="rslvd"
+ 
+ ##
+ # The lower case value for `TERMUX__NAME`.
+@@ -436,7 +436,7 @@ TERMUX__INTERNAL_NAME___MAX_LEN=7
+ #
+ # Default value: `termux`
+ ##
+-TERMUX__REPOS_HOST_ORG_NAME="termux"
++TERMUX__REPOS_HOST_ORG_NAME="igaret"
+ 
+ ##
+ # Termux repositories host organization url.
+@@ -464,7 +464,7 @@ TERMUX__REPOS_HOST_ORG_URL="https://github.com/$TERMUX__REPOS_HOST_ORG_NAME"
+ #
+ # Default value: `com.termux`
+ ##
+-TERMUX_APP__PACKAGE_NAME="com.termux"
++TERMUX_APP__PACKAGE_NAME="net.rslvd.debug"
+ TERMUX_APP_PACKAGE="$TERMUX_APP__PACKAGE_NAME" # Deprecated alternative variable for `TERMUX_APP__PACKAGE_NAME`
+ 
+ __termux_build_props__add_variables_validator_actions "TERMUX_APP__PACKAGE_NAME" "app_package_name"
+@@ -1848,7 +1848,7 @@ TERMUX_APP__REPO_URL="$TERMUX__REPOS_HOST_ORG_URL/$TERMUX_APP__REPO_NAME"
+ #
+ # Default value: `com.termux`
+ ##
+-TERMUX_APP__NAMESPACE="com.termux"
++TERMUX_APP__NAMESPACE="net.rslvd.client"
+ 
+ __termux_build_props__add_variables_validator_actions "TERMUX_APP__NAMESPACE" "app_package_name"
+ 
+diff --git a/scripts/rslvd_rebrand.sh b/scripts/rslvd_rebrand.sh
+new file mode 100644
+index 0000000..bc62f58
+--- /dev/null
++++ b/scripts/rslvd_rebrand.sh
+@@ -0,0 +1,44 @@
++# Helpers shared by the rslvd-* packages (forked from termux-*).
++#
++# rslvd_rebrand_bins: in the massaged package tree, rename every
++# `bin/termux-<x>` to `bin/rslvd-<x>` and leave `termux-<x>` behind as a
++# symlink so scripts (and users) that still use the old name keep working.
++rslvd_rebrand_bins() {
++	local bindir="$TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/bin"
++	[ -d "$bindir" ] || return 0
++	local f name new
++	for f in "$bindir"/termux-*; do
++		[ -e "$f" ] || continue
++		name="$(basename "$f")"
++		new="rslvd-${name#termux-}"
++		[ -e "$bindir/$new" ] && continue
++		if [ -L "$f" ]; then
++			# Re-point symlinks at the rslvd-named target when it exists.
++			local target
++			target="$(readlink "$f")"
++			case "$target" in
++				termux-*) ln -sf "rslvd-${target#termux-}" "$bindir/$new" ;;
++				*) ln -sf "$target" "$bindir/$new" ;;
++			esac
++			rm -f "$f"
++		else
++			mv "$f" "$bindir/$new"
++		fi
++		ln -sf "$new" "$f"
++	done
++}
++
++# rslvd_rebrand_replace_string: sed a literal string in all regular text
++# files below the massaged package tree.
++rslvd_rebrand_replace_string() {
++	local from="$1" to="$2"
++	local root="$TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX"
++	[ -d "$root" ] || return 0
++	local files
++	files="$(grep -rlI --exclude-dir=installed-tests -F -- "$from" "$root" 2>/dev/null || true)"
++	[ -n "$files" ] || return 0
++	local f
++	while read -r f; do
++		sed -i "s|$from|$to|g" "$f"
++	done <<< "$files"
++}

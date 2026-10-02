@@ -1721,13 +1721,13 @@ function AdminDashboard({ user, navigate }) {
     // Tabs
     React.createElement('div', { style: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid var(--border)', flexWrap: 'wrap' } },
       (isSiteOwner
-        ? ['overview', 'users', 'hosts', 'tunnels', 'activity', 'reserved', 'backup']
-        : ['overview', 'users', 'hosts', 'tunnels', 'activity']
+        ? ['overview', 'users', 'hosts', 'tunnels', 'activity', 'logs', 'reserved', 'backup']
+        : ['overview', 'users', 'hosts', 'tunnels', 'activity', 'logs']
       ).map(t =>
         React.createElement('button', {
           key: t, onClick: () => setTab(t),
           style: { padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 500, fontFamily: 'Inter, sans-serif', color: tab === t ? 'var(--text)' : 'var(--text2)', borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: -1 }
-        }, t === 'reserved' ? '🔒 Reserved' : t === 'activity' ? '📋 Activity' : t === 'backup' ? '💾 Backup' : t.charAt(0).toUpperCase() + t.slice(1))
+        }, t === 'reserved' ? '🔒 Reserved' : t === 'activity' ? '📋 Activity' : t === 'logs' ? '📜 Logs' : t === 'backup' ? '💾 Backup' : t.charAt(0).toUpperCase() + t.slice(1))
       )
     ),
 
@@ -1855,6 +1855,9 @@ function AdminDashboard({ user, navigate }) {
 
     // Activity log tab
     tab === 'activity' && React.createElement(ActivityLog, { logs: activity, onRefresh: loadActivity }),
+
+    // Live logs tab
+    tab === 'logs' && React.createElement(LiveLogViewer),
 
     // Reserved subdomains tab
     tab === 'reserved' && isSiteOwner && React.createElement(ReservedPanel, { key: reservedKey }),

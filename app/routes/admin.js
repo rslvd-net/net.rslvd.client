@@ -1,9 +1,47 @@
 const router = require('express').Router();
+const { spawn } = require('child_process');
 const pool = require('../db/pool');
 const { requireAdmin, requireSiteOwner } = require('../middleware/auth');
 
 // All admin routes require at least admin role (site_owner also passes)
 router.use(requireAdmin);
+
+// ── Live System Logs Stream ───────────────────────────────────────────────────
+router.get('/logs/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+  const lines = parseInt(req.query.lines) || 100;
+  const proc = spawn('journalctl', ['-u', 'rslvd', '-n', String(lines), '-f', '--no-pager']);
+
+  proc.stdout.on('data', (chunk) => {
+    const logLines = chunk.toString('utf8').split('\n');
+    for (const line of logLines) {
+      if (line.trim()) {
+        res.write(`data: ${JSON.stringify(line)}\n\n`);
+      }
+    }
+  });
+
+  proc.stderr.on('data', (chunk) => {
+    const errLines = chunk.toString('utf8').split('\n');
+    for (const line of errLines) {
+      if (line.trim()) {
+        res.write(`data: ${JSON.stringify('[STDERR] ' + line)}\n\n`);
+      }
+    }
+  });
+
+  proc.on('error', (err) => {
+    res.write(`data: ${JSON.stringify('[ERROR] ' + err.message)}\n\n`);
+  });
+
+  req.on('close', () => {
+    try { proc.kill('SIGTERM'); } catch (_) {}
+  });
+});
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 router.get('/stats', async (req, res) => {

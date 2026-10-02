@@ -1,0 +1,5 @@
+The terminal-emulator and terminal-view modules are vendored from
+https://github.com/termux/termux-app (v0.118.x), which derives from
+Terminal Emulator for Android (https://github.com/jackpal/Android-Terminal-Emulator).
+Both modules are licensed under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
