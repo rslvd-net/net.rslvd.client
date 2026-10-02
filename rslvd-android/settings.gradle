@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "rslvd"
-include ':app'
+include ':app', ':terminal-emulator', ':terminal-view'

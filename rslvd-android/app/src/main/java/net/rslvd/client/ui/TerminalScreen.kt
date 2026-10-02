@@ -1,211 +1,320 @@
 package net.rslvd.client.ui
 
 import android.content.Context
+import android.graphics.Typeface
+import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import java.io.BufferedWriter
-import java.io.OutputStreamWriter
+import androidx.compose.ui.viewinterop.AndroidView
+import com.termux.terminal.KeyHandler
+import com.termux.terminal.TerminalSession
+import com.termux.view.TerminalView
+import com.termux.view.TerminalViewClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import net.rslvd.client.BuildConfig
+import net.rslvd.client.shell.BootstrapInstaller
+import net.rslvd.client.shell.TerminalHost
 
 /**
- * A sandboxed shell session running /system/bin/sh inside the app's own
- * process space. Provides access to Android's built-in toybox commands
- * (ping, ip, netstat, nslookup, getprop, ...) for on-device network
- * diagnostics without a third-party terminal app.
+ * A real terminal: the shell runs on a pseudo-terminal and its output is
+ * rendered by a VT100/xterm emulator, so full-screen programs (nano, vim, top,
+ * less), colours, readline editing and Ctrl/Alt chords all work.
  */
-class ShellSession(context: Context) {
-    private val buffer = StringBuilder()
-    private val _output = MutableStateFlow("")
-    val output: StateFlow<String> = _output
+@Composable
+fun TerminalScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current.applicationContext
 
-    private val history = mutableListOf<String>()
-    private var historyIndex = -1
-
-    private var process: Process? = null
-    private var writer: BufferedWriter? = null
-    private val home = context.filesDir.absolutePath
-    private val tmp = context.cacheDir.absolutePath
-
-    init {
-        start()
-    }
-
-    private fun append(text: String) {
-        synchronized(buffer) {
-            buffer.append(text)
-            if (buffer.length > 200_000) buffer.delete(0, buffer.length - 150_000)
-            _output.value = buffer.toString()
-        }
-    }
-
-    private fun start() {
-        try {
-            val pb = ProcessBuilder("/system/bin/sh")
-                .redirectErrorStream(true)
-            pb.directory(java.io.File(home))
-            pb.environment()["HOME"] = home
-            pb.environment()["TMPDIR"] = tmp
-            val p = pb.start()
-            process = p
-            writer = BufferedWriter(OutputStreamWriter(p.outputStream))
-            Thread {
-                try {
-                    val reader = p.inputStream.bufferedReader()
-                    val buf = CharArray(4096)
-                    while (true) {
-                        val n = reader.read(buf)
-                        if (n < 0) break
-                        append(String(buf, 0, n))
-                    }
-                } catch (_: Exception) {
-                }
-                append("\n[process exited]\n")
-            }.apply { isDaemon = true }.start()
-            append("rslvd shell — /system/bin/sh (app sandbox)\nTry: ping -c 4 rslvd.net · ip addr · netstat · getprop\n\n")
-        } catch (e: Exception) {
-            append("Failed to start shell: ${e.message}\n")
-        }
-    }
-
-    fun run(command: String) {
-        val cmd = command.trim()
-        if (cmd.isEmpty()) return
-        if (history.lastOrNull() != cmd) history.add(cmd)
-        historyIndex = history.size
-        if (cmd == "clear") {
-            synchronized(buffer) {
-                buffer.setLength(0)
-                _output.value = ""
-            }
+    if (BuildConfig.BOOTSTRAP_ENABLED) {
+        var installed by remember { mutableStateOf(BootstrapInstaller.isInstalled(context)) }
+        if (!installed) {
+            BootstrapInstallScreen(modifier, context) { installed = true }
             return
         }
-        append("$ $cmd\n")
-        val alive = process?.let { p ->
-            try { p.exitValue(); false } catch (e: IllegalThreadStateException) { true }
-        } ?: false
-        if (!alive) {
-            append("[restarting shell]\n")
-            start()
+    }
+
+    val host = remember { TerminalHost.get(context) }
+    val density = LocalDensity.current.density
+    var exited by remember { mutableStateOf<Int?>(null) }
+    var ctrl by remember { mutableStateOf(false) }
+    var alt by remember { mutableStateOf(false) }
+    var fontSize by remember { mutableStateOf((DEFAULT_FONT_SP * density).toInt()) }
+    var termView by remember { mutableStateOf<TerminalView?>(null) }
+
+    DisposableEffect(host) {
+        host.onFinished = { exited = it }
+        onDispose {
+            host.onFinished = null
+            host.view = null
         }
-        try {
-            writer?.apply {
-                write(cmd)
-                newLine()
-                flush()
+    }
+
+    val client = remember {
+        object : TerminalViewClient {
+            override fun onScale(scale: Float): Float {
+                if (scale < 0.9f || scale > 1.1f) {
+                    val step = (2 * density).toInt().coerceAtLeast(1)
+                    val size = (fontSize + if (scale > 1f) step else -step)
+                        .coerceIn((MIN_FONT_SP * density).toInt(), (MAX_FONT_SP * density).toInt())
+                    if (size != fontSize) {
+                        fontSize = size
+                        termView?.setTextSize(size)
+                    }
+                    return 1f
+                }
+                return scale
             }
-        } catch (e: Exception) {
-            append("write failed: ${e.message}\n")
+
+            override fun onSingleTapUp(e: MotionEvent) {
+                termView?.let { v ->
+                    v.requestFocus()
+                    val imm = v.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                    imm.showSoftInput(v, 0)
+                }
+            }
+
+            override fun shouldBackButtonBeMappedToEscape() = false
+            override fun shouldEnforceCharBasedInput() = true
+            override fun shouldUseCtrlSpaceWorkaround() = false
+            override fun isTerminalViewSelected() = true
+            override fun copyModeChanged(copyMode: Boolean) {}
+            override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean {
+                if (keyCode == KeyEvent.KEYCODE_ENTER && !session.isRunning) {
+                    host.restart()
+                    exited = null
+                    return true
+                }
+                return false
+            }
+            override fun onKeyUp(keyCode: Int, e: KeyEvent) = false
+            override fun onLongPress(event: MotionEvent) = false
+
+            // One-shot modifiers from the extra-keys row.
+            override fun readControlKey(): Boolean = ctrl.also { if (it) ctrl = false }
+            override fun readAltKey(): Boolean = alt.also { if (it) alt = false }
+            override fun readShiftKey() = false
+            override fun readFnKey() = false
+
+            override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession) = false
+            override fun onEmulatorSet() {}
+
+            override fun logError(tag: String?, message: String?) {}
+            override fun logWarn(tag: String?, message: String?) {}
+            override fun logInfo(tag: String?, message: String?) {}
+            override fun logDebug(tag: String?, message: String?) {}
+            override fun logVerbose(tag: String?, message: String?) {}
+            override fun logStackTraceWithMessage(tag: String?, message: String?, e: Exception?) {}
+            override fun logStackTrace(tag: String?, e: Exception?) {}
         }
     }
 
-    fun previousCommand(): String? {
-        if (history.isEmpty()) return null
-        if (historyIndex > 0) historyIndex--
-        return history.getOrNull(historyIndex)
+    fun sendKey(keyCode: Int) {
+        val v = termView ?: return
+        var mod = 0
+        if (ctrl) { mod = mod or KeyHandler.KEYMOD_CTRL; ctrl = false }
+        if (alt) { mod = mod or KeyHandler.KEYMOD_ALT; alt = false }
+        v.handleKeyCode(keyCode, mod)
     }
 
-    fun nextCommand(): String? {
-        if (history.isEmpty()) return null
-        if (historyIndex < history.size) historyIndex++
-        return if (historyIndex >= history.size) "" else history[historyIndex]
-    }
-
-    fun close() {
-        try {
-            writer?.close()
-        } catch (_: Exception) {
+    fun sendText(text: String) {
+        val v = termView ?: return
+        text.codePoints().forEach { cp ->
+            v.inputCodePoint(TerminalView.KEY_EVENT_SOURCE_VIRTUAL_KEYBOARD, cp, false, false)
         }
-        process?.destroy()
-        process = null
+    }
+
+    Column(modifier.fillMaxSize().background(TERMINAL_BG)) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .semantics { contentDescription = "Terminal" },
+                factory = { ctx ->
+                    TerminalView(ctx, null).apply {
+                        setTerminalViewClient(client)
+                        setTextSize(fontSize)
+                        setTypeface(Typeface.MONOSPACE)
+                        setBackgroundColor(TERMINAL_BG_INT)
+                        keepScreenOn = true
+                        isFocusable = true
+                        isFocusableInTouchMode = true
+                        termView = this
+                        host.view = this
+                    }
+                },
+                update = { v ->
+                    if (host.view !== v) host.view = v
+                },
+            )
+            exited?.let { code ->
+                Column(
+                    Modifier
+                        .align(Alignment.Center)
+                        .background(Color(0xCC000000))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("Shell exited (status $code)", color = Color.White)
+                    Button(onClick = { host.restart(); exited = null }) { Text("Restart shell") }
+                }
+            }
+        }
+        ExtraKeysRow(
+            ctrl = ctrl,
+            alt = alt,
+            onToggleCtrl = { ctrl = !ctrl },
+            onToggleAlt = { alt = !alt },
+            onKey = ::sendKey,
+            onText = ::sendText,
+        )
     }
 }
 
 @Composable
-fun TerminalScreen(modifier: Modifier = Modifier) {
-    val context = LocalContext.current.applicationContext
-    val session = remember { ShellSession(context) }
-    DisposableEffect(Unit) { onDispose { session.close() } }
-
-    val output by session.output.collectAsState()
-    var input by remember { mutableStateOf("") }
-    val scroll = rememberScrollState()
-
-    LaunchedEffect(output) { scroll.scrollTo(scroll.maxValue) }
-
-    fun submit() {
-        session.run(input)
-        input = ""
+private fun ExtraKeysRow(
+    ctrl: Boolean,
+    alt: Boolean,
+    onToggleCtrl: () -> Unit,
+    onToggleAlt: () -> Unit,
+    onKey: (Int) -> Unit,
+    onText: (String) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF15151C))
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Key("ESC", "Escape") { onKey(KeyEvent.KEYCODE_ESCAPE) }
+        Key("TAB", "Tab") { onKey(KeyEvent.KEYCODE_TAB) }
+        Key("CTRL", "Control", active = ctrl, onClick = onToggleCtrl)
+        Key("ALT", "Alt", active = alt, onClick = onToggleAlt)
+        Key("-", "Minus") { onText("-") }
+        Key("/", "Slash") { onText("/") }
+        Key("|", "Pipe") { onText("|") }
+        Key("~", "Tilde") { onText("~") }
+        Key("HOME", "Home") { onKey(KeyEvent.KEYCODE_MOVE_HOME) }
+        Key("\u2190", "Left") { onKey(KeyEvent.KEYCODE_DPAD_LEFT) }
+        Key("\u2191", "Up") { onKey(KeyEvent.KEYCODE_DPAD_UP) }
+        Key("\u2193", "Down") { onKey(KeyEvent.KEYCODE_DPAD_DOWN) }
+        Key("\u2192", "Right") { onKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
+        Key("END", "End") { onKey(KeyEvent.KEYCODE_MOVE_END) }
+        Key("PGUP", "Page up") { onKey(KeyEvent.KEYCODE_PAGE_UP) }
+        Key("PGDN", "Page down") { onKey(KeyEvent.KEYCODE_PAGE_DOWN) }
+        Key("DEL", "Delete") { onKey(KeyEvent.KEYCODE_FORWARD_DEL) }
     }
+}
 
-    Column(modifier.fillMaxSize()) {
-        SelectionContainer(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(Color(0xFF0A0A0F))
-                .verticalScroll(scroll)
-                .padding(12.dp),
+@Composable
+private fun Key(label: String, description: String, active: Boolean = false, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier
+            .height(36.dp)
+            .widthIn(min = 40.dp)
+            .semantics { contentDescription = description },
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 13.sp,
+            color = if (active) MaterialTheme.colorScheme.primary else Color(0xFFD0D0DA),
+        )
+    }
+}
+
+private val TERMINAL_BG = Color(0xFF0A0A0F)
+private const val TERMINAL_BG_INT = 0xFF0A0A0F.toInt()
+private const val DEFAULT_FONT_SP = 13
+private const val MIN_FONT_SP = 7
+private const val MAX_FONT_SP = 36
+
+@Composable
+private fun BootstrapInstallScreen(
+    modifier: Modifier,
+    context: Context,
+    onInstalled: () -> Unit,
+) {
+    var status by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(24.dp),
         ) {
+            Text("Shell environment", style = MaterialTheme.typography.titleLarge)
             Text(
-                output,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                color = Color(0xFFE8E8F0),
+                "Install the rslvd shell environment — a full Linux userland with " +
+                    "pkg/apt, dpkg, netcat, nmap, dig and more, served from repo.rslvd.net. " +
+                    "One-time download (~65 MB) into the app's private storage.",
+                style = MaterialTheme.typography.bodyMedium,
             )
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        ) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Command…  (clear to reset)") },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { submit() }),
-            )
-            Spacer(Modifier.width(6.dp))
-            IconButton(onClick = { submit() }) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Run")
+            if (busy) {
+                CircularProgressIndicator()
+                Text(status ?: "Working…", style = MaterialTheme.typography.bodySmall)
+            } else {
+                Button(onClick = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                BootstrapInstaller.install(context) { status = it }
+                            }
+                            onInstalled()
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            error = e.message ?: "Install failed"
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }) { Text("Install environment") }
+            }
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

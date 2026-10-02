@@ -821,6 +821,9 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
   const [showConnect, setShowConnect] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [deviceLock, setDeviceLock] = useState(t.device_lock === true);
+  const [boundName, setBoundName] = useState(t.bound_device_name || (t.bound_at ? 'unnamed device' : null));
+  const [lockBusy, setLockBusy] = useState(false);
 
   const handleDelete = async () => {
     if (!confirm(`Delete tunnel ${t.name}?`)) return;
@@ -837,6 +840,28 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
       if (onHttpsToggle) onHttpsToggle(t.id, next);
     } catch (err) { alert(err.message); }
     finally { setToggling(false); }
+  };
+
+  const handleDeviceLockToggle = async () => {
+    const next = !deviceLock;
+    if (next && !confirm('Enable device lock? The first device to connect will be permanently bound to this tunnel\u2019s token \u2014 other devices will be rejected. (DNS2TCP tunnels can\u2019t use device lock.)')) return;
+    setLockBusy(true);
+    try {
+      await API.patch(`/tunnels/${t.id}/device-lock`, { device_lock: next });
+      setDeviceLock(next);
+      if (!next) setBoundName(null);
+    } catch (err) { alert(err.message); }
+    finally { setLockBusy(false); }
+  };
+
+  const handleDeviceReset = async () => {
+    if (!confirm('Reset device binding? The next device to connect becomes the new bound device.')) return;
+    setLockBusy(true);
+    try {
+      await API.post(`/tunnels/${t.id}/reset-device`, {});
+      setBoundName(null);
+    } catch (err) { alert(err.message); }
+    finally { setLockBusy(false); }
   };
 
   const fqdn = t.fqdn || `${t.name}.rslvd.net`;
@@ -873,7 +898,16 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
           title: useHttps ? 'HTTPS enabled (click to switch to HTTP)' : 'HTTP only (click to enable HTTPS)',
           style: { fontSize: 11, padding: '2px 8px', minWidth: 60, opacity: toggling ? 0.6 : 1 }
         }, toggling ? '...' : (useHttps ? '🔒 HTTPS' : '🔓 HTTP')),
-        React.createElement('span', { className: `badge badge-${t.status === 'active' ? 'green' : 'yellow'}` }, t.status),
+        protocol !== 'dns2tcp' && React.createElement('button', {
+          className: 'btn btn-sm btn-secondary',
+          onClick: handleDeviceLockToggle, disabled: lockBusy,
+          title: deviceLock ? 'Device lock on — token bound to one device (click to disable)' : 'Device lock off — any device with the token can connect (click to enable)',
+          style: { fontSize: 11, padding: '2px 8px', opacity: lockBusy ? 0.6 : 1 }
+        }, lockBusy ? '...' : (deviceLock ? '🔐 Locked' : '🔓 Any device')),
+        React.createElement('span', {
+          className: `badge badge-${t.connected ? 'green' : 'yellow'}`,
+          title: t.connected ? 'A tunnel agent is connected' : 'No tunnel agent is connected — run the client with your token'
+        }, t.connected ? 'connected' : 'waiting for agent'),
         React.createElement('button', {
           className: `btn btn-primary btn-sm`,
           onClick: () => setShowConnect(!showConnect)
@@ -984,6 +1018,16 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
       React.createElement('div', { style: { marginTop: 12, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 8, fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 8 } },
         '🔗 Public URL: ',
         React.createElement('a', { href: publicUrl, target: '_blank', style: { color: 'var(--accent2)', fontWeight: 600 } }, publicUrl)
+      ),
+
+      deviceLock && React.createElement('div', { style: { marginTop: 8, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 8, fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+        '🔐 Device lock: ',
+        boundName
+          ? React.createElement(React.Fragment, null,
+              React.createElement('strong', { style: { color: 'var(--text2)' } }, boundName),
+              React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: handleDeviceReset, disabled: lockBusy, style: { fontSize: 11, padding: '2px 8px' } }, 'Reset binding')
+            )
+          : 'waiting for first device — the next device to connect will be bound to this token'
       )
     )
   );
@@ -1234,6 +1278,76 @@ function HostCard({ host: h, onDelete, onRegenKey, onHttpsToggle, onIpUpdated, i
   );
 }
 
+// ── DNS change log (audit history) ───────────────────────────────────────────
+function DnsChangeLog({ hosts, tunnels }) {
+  const [rows, setRows] = useState(null);
+  const [filter, setFilter] = useState('');
+
+  const load = async (fqdn) => {
+    setRows(null);
+    try { setRows(await API.get(`/dns-changes${fqdn ? `?fqdn=${encodeURIComponent(fqdn)}` : ''}`)); }
+    catch (e) { setRows([]); }
+  };
+
+  useEffect(() => { load(filter); }, [filter]);
+
+  const handleExport = async () => {
+    const res = await fetch(`/api/dns-changes/export${filter ? `?fqdn=${encodeURIComponent(filter)}` : ''}`, { headers: API.headers() });
+    if (!res.ok) { alert('Export failed'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rslvd-dns-changes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const CHANGE_LABELS = {
+    host_created: '➕ Host created', host_deleted: '🗑️ Host deleted',
+    tunnel_created: '➕ Tunnel created', tunnel_deleted: '🗑️ Tunnel deleted',
+    ip_updated: '🔄 IP updated', record_created: '📌 Record created',
+    https_enabled: '🔒 HTTPS on', https_disabled: '🔓 HTTPS off',
+  };
+
+  const names = [...new Set([...hosts.map(h => h.fqdn), ...tunnels.map(t => t.fqdn)])].filter(Boolean);
+
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'flex-between mb-4', style: { flexWrap: 'wrap', gap: 8 } },
+      React.createElement('h2', { className: 'section-title', style: { margin: 0 } }, 'DNS change log'),
+      React.createElement('div', { style: { display: 'flex', gap: 8 } },
+        React.createElement('select', { className: 'input', value: filter, onChange: e => setFilter(e.target.value), style: { padding: '6px 10px', fontSize: 13, width: 'auto' } },
+          React.createElement('option', { value: '' }, 'All names'),
+          names.map(n => React.createElement('option', { key: n, value: n }, n))
+        ),
+        React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: handleExport }, '⬇ Export CSV')
+      )
+    ),
+    React.createElement(Alert, { type: 'info' }, '📜 An audit-ready history of every DNS-affecting change on your account — creates, deletes, IP updates, and HTTPS toggles — exportable as CSV.'),
+    rows === null
+      ? React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 32, color: 'var(--text2)' } }, 'Loading…')
+      : rows.length === 0
+        ? React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 32, color: 'var(--text2)' } }, 'No DNS changes recorded yet. New changes will appear here.')
+        : React.createElement('div', { className: 'card', style: { padding: 0, overflowX: 'auto' } },
+          React.createElement('table', { className: 'host-table' },
+            React.createElement('thead', null, React.createElement('tr', null,
+              ['When', 'Name', 'Change', 'Type', 'Old → New', 'Source'].map(h => React.createElement('th', { key: h }, h))
+            )),
+            React.createElement('tbody', null, rows.map(r =>
+              React.createElement('tr', { key: r.id },
+                React.createElement('td', { style: { whiteSpace: 'nowrap', fontSize: 12 } }, new Date(r.created_at).toLocaleString()),
+                React.createElement('td', { style: { fontFamily: 'monospace', fontSize: 12 } }, r.fqdn),
+                React.createElement('td', { style: { fontSize: 12 } }, CHANGE_LABELS[r.change] || r.change),
+                React.createElement('td', { style: { fontSize: 12 } }, r.record_type || '—'),
+                React.createElement('td', { style: { fontFamily: 'monospace', fontSize: 12 } }, (r.old_value || r.new_value) ? `${r.old_value || '—'} → ${r.new_value || '—'}` : '—'),
+                React.createElement('td', { style: { fontSize: 12, color: 'var(--text2)' } }, r.source === 'ddns_api' ? 'DDNS client' : 'Dashboard')
+              )
+            ))
+          )
+        )
+  );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({ user, navigate, refreshUser, pwa }) {
   const [hosts, setHosts] = useState([]);
@@ -1452,10 +1566,10 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
 
     // Tabs
     React.createElement('div', { style: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid var(--border)' } },
-      ['hosts', 'tunnels', 'billing'].map(t => React.createElement('button', {
+      ['hosts', 'tunnels', 'billing', 'dns_log'].map(t => React.createElement('button', {
         key: t, onClick: () => setTab(t),
         style: { padding: '10px 20px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 500, fontFamily: 'Inter, sans-serif', color: tab === t ? 'var(--text)' : 'var(--text2)', borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: -1 }
-      }, t.charAt(0).toUpperCase() + t.slice(1)))
+      }, t === 'dns_log' ? '📜 DNS Log' : t.charAt(0).toUpperCase() + t.slice(1)))
     ),
 
     // Hosts tab
@@ -1528,6 +1642,9 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setTab('billing') }, 'Upgrade')
       )
     ),
+
+    // DNS change log tab
+    tab === 'dns_log' && React.createElement(DnsChangeLog, { hosts, tunnels }),
 
     // Billing tab
     tab === 'billing' && React.createElement('div', null,
@@ -3410,7 +3527,7 @@ function LegalWall({ user, onAccepted }) {
 
 // ── Downloads Page ────────────────────────────────────────────────────────────
 function DownloadsPage({ navigate }) {
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   const BASE = '/dl';
 
   const platforms = [

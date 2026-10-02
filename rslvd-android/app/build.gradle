@@ -15,16 +15,38 @@ if (hasKeystore) {
 
 android {
     namespace 'net.rslvd.client'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId 'net.rslvd.client'
         minSdk 23
-        targetSdk 35
-        versionCode 12
-        versionName '2.9'
+        targetSdk 36
+        versionCode 20
+        versionName '3.7'
         vectorDrawables { useSupportLibrary true }
     }
+
+    flavorDimensions = ['dist']
+    productFlavors {
+        play {
+            dimension 'dist'
+            // Play Store build: keeps the sandboxed /system/bin/sh shell only.
+            buildConfigField 'boolean', 'BOOTSTRAP_ENABLED', 'false'
+        }
+        full {
+            dimension 'dist'
+            // Sideload build with the Termux-style bootstrap environment. The
+            // package name must be net.rslvd.debug because the repo binaries
+            // are compiled with prefix /data/data/net.rslvd.debug/files/usr.
+            applicationId 'net.rslvd.debug'
+            // targetSdk 28 so the app may exec downloaded binaries from its
+            // data dir (Android 10+ W^X blocks this for targetSdk >= 29 —
+            // same reason Termux's sideload build targets 28).
+            targetSdk 28
+            buildConfigField 'boolean', 'BOOTSTRAP_ENABLED', 'true'
+        }
+    }
+
 
     if (hasKeystore) {
         signingConfigs {
@@ -39,7 +61,6 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix '.debug'
             versionNameSuffix '-debug'
         }
         release {
@@ -85,6 +106,9 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-extended'
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.navigation:navigation-compose:2.7.7'
+
+    // PTY-backed terminal (vendored from termux-app, Apache-2.0)
+    implementation project(':terminal-view')
 
     // Networking
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'

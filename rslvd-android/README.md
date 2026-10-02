@@ -21,6 +21,11 @@ No WebView — it talks directly to the rslvd REST API.
   - **Universal**: add any DynDNS-compatible provider via a URL template containing
     the `{ip}` token (Google Domains, No-IP, DuckDNS, Cloudflare via a worker, etc.).
   - Reschedules after reboot (`BootReceiver`) and posts a status notification.
+- **Shell** — a real terminal: native PTY (`forkpty` via JNI) + xterm-256color
+  emulator, so `nano`, `vim`, `top`, `less`, readline history and ANSI colours all
+  work. Extra-keys row for ESC/TAB/CTRL/ALT/arrows/Home/End/PgUp/PgDn/Del. The
+  Play flavour runs the sandboxed `/system/bin/sh`; the full flavour
+  (`net.rslvd.debug`) runs bash from the bootstrap `$PREFIX`.
 
 ## Architecture
 
@@ -31,12 +36,14 @@ No WebView — it talks directly to the rslvd REST API.
 | Networking   | Retrofit + OkHttp + Moshi (`ApiClient`/`ApiService`) |
 | Auth storage | `androidx.security:security-crypto` (encrypted prefs) |
 | Background   | `androidx.work` (`DdnsWorker`, `DdnsScheduler`)   |
+| Terminal     | `:terminal-emulator` / `:terminal-view` (vendored from termux-app, Apache-2.0) driven by `shell/TerminalHost` |
 
 API base URL: `https://rslvd.net/api/` (see `data/ApiClient.kt`).
 
 ## Build
 
-Requirements: JDK 17, Android SDK 34 (`ANDROID_HOME` set).
+Requirements: JDK 17, Android SDK 36 + NDK 27.2.12479018 (`ANDROID_HOME` set; the NDK
+builds the PTY helper `libtermux.so` for arm64-v8a / armeabi-v7a / x86_64).
 
 ```bash
 # Debug APK

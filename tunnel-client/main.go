@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base32"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -26,8 +29,41 @@ const (
 	dns2tcpPort      = "7200"
 	
 	reconnectWait = 5 * time.Second
-	version       = "1.2.0"
+	version       = "1.3.0"
 )
+
+var deviceNameRe = regexp.MustCompile(`[^A-Za-z0-9._-]`)
+
+// deviceID returns a stable fingerprint for this machine, used by the server's
+// optional device-lock feature. Derived from the OS machine id (when available)
+// plus the hostname — never leaves raw identifiers, only a hash.
+func deviceID() string {
+	var seed string
+	for _, p := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
+		if b, err := os.ReadFile(p); err == nil {
+			seed = strings.TrimSpace(string(b))
+			break
+		}
+	}
+	host, _ := os.Hostname()
+	if seed == "" {
+		seed = host + "|" + os.Getenv("USER") + os.Getenv("USERNAME")
+	}
+	sum := sha256.Sum256([]byte("rslvd-device|" + seed + "|" + host))
+	return hex.EncodeToString(sum[:16])
+}
+
+func deviceName() string {
+	host, _ := os.Hostname()
+	name := deviceNameRe.ReplaceAllString(host, "-")
+	if len(name) > 40 {
+		name = name[:40]
+	}
+	if name == "" {
+		name = "unknown"
+	}
+	return name
+}
 
 type TunnelMode string
 
@@ -114,7 +150,7 @@ func connectTCPControl(token string) (net.Conn, error) {
 		return nil, fmt.Errorf("cannot reach %s:%s — %w", serverHost, tcpControlPort, err)
 	}
 
-	fmt.Fprintf(conn, "HELLO %s\n", token)
+	fmt.Fprintf(conn, "HELLO %s %s %s\n", token, deviceID(), deviceName())
 
 	line, err := readLine(conn, 10*time.Second)
 	if err != nil {
@@ -226,7 +262,7 @@ func runUDPTunnel(token, localPort string) error {
 	defer controlConn.Close()
 
 	// Send registration
-	controlConn.Write([]byte("HELLO " + token + "\n"))
+	controlConn.Write([]byte("HELLO " + token + " " + deviceID() + " " + deviceName() + "\n"))
 
 	// Wait for OK
 	buf := make([]byte, 1024)

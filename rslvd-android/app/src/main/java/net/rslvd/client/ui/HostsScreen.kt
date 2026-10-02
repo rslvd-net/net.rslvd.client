@@ -46,18 +46,19 @@ import net.rslvd.client.data.Host
 @Composable
 fun HostsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val state by vm.hosts.collectAsState()
+    val ddns by vm.ddns.collectAsState()
     var showAdd by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<Host?>(null) }
     var setIpHost by remember { mutableStateOf<Host?>(null) }
 
-    LaunchedEffect(Unit) { if (state.items.isEmpty()) vm.loadHosts() }
+    LaunchedEffect(Unit) { vm.loadHosts(); vm.refreshDdns() }
 
     Scaffold(
         modifier = modifier,
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAdd = true },
-                icon = { Icon(Icons.Filled.Add, null) },
+                icon = { Icon(Icons.Filled.Add, contentDescription = "Add host") },
                 text = { Text("Add host") },
             )
         },
@@ -78,7 +79,8 @@ fun HostsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                     items(state.items, key = { it.id }) { host ->
                         HostCard(
                             host = host,
-                            onCopyKey = { host.updateKey?.let { vm.copyText("update key", it) } },
+                            inDdns = ddns.targets.any { it.id == "host-${host.id}" },
+                            onCopyKey = { host.updateKey?.let { vm.copyText("update key", it, sensitive = true) } },
                             onCopyFqdn = { vm.copyText("hostname", host.fqdn) },
                             onAddDdns = { vm.addRslvdTarget(host) },
                             onSetIp = { setIpHost = host },
@@ -101,7 +103,7 @@ fun HostsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
             title = { Text("Delete host") },
-            text = { Text("Delete ${host.fqdn}? This removes its DNS records.") },
+            text = { Text("Delete ${host.fqdn}? This removes its DNS records and its DDNS target on this device.") },
             confirmButton = { TextButton(onClick = { vm.deleteHost(host); confirmDelete = null }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
         )
@@ -118,6 +120,7 @@ fun HostsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 @Composable
 private fun HostCard(
     host: Host,
+    inDdns: Boolean,
     onCopyKey: () -> Unit,
     onCopyFqdn: () -> Unit,
     onAddDdns: () -> Unit,
@@ -137,11 +140,11 @@ private fun HostCard(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             )
             host.lastUpdated?.let {
-                Text("Updated: $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                Text("Updated: ${formatIsoTimestamp(it)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onAddDdns) { Text("Add to DDNS") }
+                OutlinedButton(onClick = onAddDdns, enabled = !inDdns) { Text(if (inDdns) "In DDNS ✓" else "Add to DDNS") }
                 if (!host.updateKey.isNullOrBlank()) {
                     OutlinedButton(onClick = onSetIp) { Text("Set IP") }
                 }

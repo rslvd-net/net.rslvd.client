@@ -34,6 +34,18 @@ import net.rslvd.client.data.LoginResult
 
 @Composable
 fun AuthScreen(vm: AppViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("rslvd_ui", android.content.Context.MODE_PRIVATE) }
+    var showIntro by remember { mutableStateOf(!prefs.getBoolean("intro_seen", false)) }
+
+    if (showIntro) {
+        IntroScreen(onContinue = {
+            prefs.edit().putBoolean("intro_seen", true).apply()
+            showIntro = false
+        })
+        return
+    }
+
     var isRegister by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -137,5 +149,50 @@ fun AuthScreen(vm: AppViewModel) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun IntroScreen(onContinue: () -> Unit) {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("rslvd", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(
+                "Your home network, reachable from anywhere",
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Spacer(Modifier.height(28.dp))
+            IntroPoint(
+                "\uD83C\uDF10  A permanent address",
+                "Get your own yourname.rslvd.net hostname that always points at your home server, NAS or router — even when your internet IP changes.",
+            )
+            IntroPoint(
+                "\uD83D\uDD04  Automatic DDNS updates",
+                "This app keeps your hostname up to date in the background whenever your public IP changes.",
+            )
+            IntroPoint(
+                "\uD83D\uDE87  Tunnels through CGNAT",
+                "Behind a carrier NAT with no public IP? Tunnels expose your local services through rslvd.net with automatic HTTPS — connect right from this app.",
+            )
+            Spacer(Modifier.height(28.dp))
+            Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) { Text("Get started") }
+        }
+    }
+}
+
+@Composable
+private fun IntroPoint(title: String, body: String) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(body, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
     }
 }

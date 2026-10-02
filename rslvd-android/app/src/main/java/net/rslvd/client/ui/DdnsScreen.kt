@@ -44,6 +44,8 @@ import java.util.Locale
 fun DdnsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val state by vm.ddns.collectAsState()
     var showAddCustom by remember { mutableStateOf(false) }
+    var confirmRemove by remember { mutableStateOf<DdnsTarget?>(null) }
+    val requestNotifications = rememberNotificationPermissionRequest()
 
     Column(
         modifier
@@ -63,7 +65,10 @@ fun DdnsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         )
                     }
-                    Switch(checked = state.enabled, onCheckedChange = { vm.setDdnsEnabled(it) })
+                    Switch(checked = state.enabled, onCheckedChange = {
+                        if (it) requestNotifications()
+                        vm.setDdnsEnabled(it)
+                    })
                 }
                 Spacer(Modifier.height(10.dp))
                 Text("Check every", fontSize = 13.sp)
@@ -104,9 +109,19 @@ fun DdnsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text("No targets yet.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
         } else {
             state.targets.forEach { target ->
-                TargetCard(target) { vm.removeTarget(target.id) }
+                TargetCard(target) { confirmRemove = target }
             }
         }
+    }
+
+    confirmRemove?.let { target ->
+        AlertDialog(
+            onDismissRequest = { confirmRemove = null },
+            title = { Text("Remove DDNS target") },
+            text = { Text("Stop updating ${target.label}? The host itself is not deleted — you can re-add it from the Hosts tab.") },
+            confirmButton = { TextButton(onClick = { vm.removeTarget(target.id); confirmRemove = null }) { Text("Remove") } },
+            dismissButton = { TextButton(onClick = { confirmRemove = null }) { Text("Cancel") } },
+        )
     }
 
     if (showAddCustom) {

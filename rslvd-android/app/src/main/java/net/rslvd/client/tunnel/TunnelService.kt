@@ -86,7 +86,7 @@ class TunnelService : Service() {
                     names[id] = name
                     setState(id, "connecting")
                     jobs[id] = scope.launch {
-                        val client = TunnelClient(token, targetHost, targetPort, protocol) { status ->
+                        val client = TunnelClient(token, targetHost, targetPort, protocol, DeviceIdentity.id(this@TunnelService), DeviceIdentity.name()) { status ->
                             setState(id, status)
                             updateNotification()
                         }
@@ -102,10 +102,11 @@ class TunnelService : Service() {
             }
             ACTION_STOP -> {
                 val id = intent.getStringExtra(EXTRA_ID)
-                if (id != null) {
-                    jobs.remove(id)?.cancel()
-                    names.remove(id)
-                    clearState(id)
+                val ids = if (id != null) listOf(id) else jobs.keys.toList()
+                for (tid in ids) {
+                    jobs.remove(tid)?.cancel()
+                    names.remove(tid)
+                    clearState(tid)
                 }
                 stopIfIdle()
                 updateNotification()
@@ -151,11 +152,20 @@ class TunnelService : Service() {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val stopIntent = PendingIntent.getService(
+            this, 1, Intent(this, TunnelService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle("rslvd tunnel")
             .setContentText(text)
             .setContentIntent(contentIntent)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                if (active.size > 1) "Stop all" else "Stop",
+                stopIntent,
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .build()

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="1.2.0"
+VERSION="1.3.0"
 ARCHES=("amd64" "arm64")
 DEB_ARCH_MAP=("amd64:amd64" "arm64:arm64")
 

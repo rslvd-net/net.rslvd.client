@@ -63,4 +63,7 @@ interface ApiService {
 
     @POST("support/{id}/escalate")
     suspend fun escalateTicket(@Path("id") id: Int): Response<SupportTicket>
+
+    @POST("account/delete")
+    suspend fun deleteAccount(@Body body: DeleteAccountRequest): Response<GenericResponse>
 }

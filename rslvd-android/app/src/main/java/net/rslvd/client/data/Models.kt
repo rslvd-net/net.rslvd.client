@@ -11,6 +11,7 @@ data class User(
     val maxTunnels: Int? = null,
     val status: String? = null,
     val role: String? = null,
+    val isSiteOwner: Boolean = false,
     val emailVerified: Boolean = false,
     val tosAccepted: Boolean = true,
     val currentLegalVersion: String? = null,
@@ -67,6 +68,7 @@ data class Tunnel(
     val fqdn: String? = null,
     val token: String? = null,
     val active: Boolean = true,
+    val connected: Boolean? = null,
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "parent_tunnel_id") val parentTunnelId: String? = null,
     @Json(name = "force_https") val forceHttps: Boolean = true,
@@ -139,6 +141,10 @@ data class CreateTicketRequest(
 
 data class TicketReplyRequest(
     val body: String,
+)
+
+data class DeleteAccountRequest(
+    val password: String,
 )
 
 data class GenericResponse(

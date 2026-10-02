@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../db/pool');
 const ionos = require('../lib/ionos');
+const dnsAudit = require('../lib/dns-audit');
 const rateLimit = require('express-rate-limit');
 
 const limiter = rateLimit({
@@ -49,13 +50,19 @@ router.get('/', async (req, res) => {
 
     if (ipv4) {
       const r = await ionos.upsertRecord(host.fqdn, 'A', ipv4);
-      if (r.action !== 'unchanged') changed = true;
+      if (r.action !== 'unchanged') {
+        changed = true;
+        dnsAudit.record({ userId: host.user_id, hostId: host.id, fqdn: host.fqdn, recordType: 'A', change: r.action === 'created' ? 'record_created' : 'ip_updated', oldValue: host.ip_address, newValue: ipv4, source: 'ddns_api', req });
+      }
       if (r.action === 'created') v4RecordId = r.recordId;
     }
 
     if (ipv6 && isValidIPv6(ipv6)) {
       const r = await ionos.upsertRecord(host.fqdn, 'AAAA', ipv6);
-      if (r.action !== 'unchanged') changed = true;
+      if (r.action !== 'unchanged') {
+        changed = true;
+        dnsAudit.record({ userId: host.user_id, hostId: host.id, fqdn: host.fqdn, recordType: 'AAAA', change: r.action === 'created' ? 'record_created' : 'ip_updated', oldValue: host.ipv6_address, newValue: ipv6, source: 'ddns_api', req });
+      }
       if (r.action === 'created') v6RecordId = r.recordId;
     }
 

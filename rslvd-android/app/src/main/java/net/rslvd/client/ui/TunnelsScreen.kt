@@ -51,14 +51,16 @@ fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     var showAdd by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<Tunnel?>(null) }
 
-    LaunchedEffect(Unit) { if (state.items.isEmpty()) vm.loadTunnels() }
+    val requestNotifications = rememberNotificationPermissionRequest()
+
+    LaunchedEffect(Unit) { vm.loadTunnels() }
 
     Scaffold(
         modifier = modifier,
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAdd = true },
-                icon = { Icon(Icons.Filled.Add, null) },
+                icon = { Icon(Icons.Filled.Add, contentDescription = "Add tunnel") },
                 text = { Text("Add tunnel") },
             )
         },
@@ -86,9 +88,9 @@ fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                                 val flag = when (proto) { "udp" -> "-udp "; "dns2tcp" -> "-dns "; else -> "" }
                                 val cmd = "rslvd-tunnel $flag${t.token} ${t.targetPort ?: ""}".trim()
                                 val url = t.fqdn?.let { f -> "${if (t.forceHttps) "https" else "http"}://$f" } ?: ""
-                                vm.copyText("token + URL", listOf(url, cmd).filter { it.isNotBlank() }.joinToString("\n"))
+                                vm.copyText("token + URL", listOf(url, cmd).filter { it.isNotBlank() }.joinToString("\n"), sensitive = true)
                             },
-                            onConnect = { vm.connectTunnel(t) },
+                            onConnect = { requestNotifications(); vm.connectTunnel(t) },
                             onDisconnect = { vm.disconnectTunnel(t) },
                             onDelete = { confirmDelete = t },
                         )
@@ -127,7 +129,9 @@ private fun TunnelCard(
     onDisconnect: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val connected = status != null
+    val runningLocally = status != null
+    val agentAttached = status == "connected" || tunnel.connected == true
+    val statusLabel = status ?: if (tunnel.connected == true) "connected" else "waiting for agent"
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -135,16 +139,15 @@ private fun TunnelCard(
                 IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
             }
             Text(
-                "${tunnel.protocol?.uppercase() ?: "TCP"} → ${tunnel.targetHost ?: "localhost"}:${tunnel.targetPort ?: "?"}" +
-                    (status?.let { "  ·  $it" } ?: ""),
+                "${tunnel.protocol?.uppercase() ?: "TCP"} → ${tunnel.targetHost ?: "localhost"}:${tunnel.targetPort ?: "?"}  ·  $statusLabel",
                 fontSize = 13.sp,
-                color = if (status == "connected") MaterialTheme.colorScheme.primary
+                color = if (agentAttached) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (!tunnel.token.isNullOrBlank()) {
-                    if (connected) {
+                    if (runningLocally) {
                         OutlinedButton(onClick = onDisconnect) { Text("Disconnect") }
                     } else {
                         OutlinedButton(onClick = onConnect) {

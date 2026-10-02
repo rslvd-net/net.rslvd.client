@@ -24,6 +24,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/track', require('./routes/track'));
 app.use('/api/beta', require('./routes/beta'));
+app.use('/api/dns-changes', require('./routes/dns-changes'));
 
 // Public IP detection for PWA DDNS auto-updater
 app.get('/api/ip', (req, res) => {

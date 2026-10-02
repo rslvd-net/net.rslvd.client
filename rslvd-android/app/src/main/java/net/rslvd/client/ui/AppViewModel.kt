@@ -85,10 +85,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun snackbarShown() { _snackbar.value = null }
     private fun toast(msg: String) { _snackbar.value = msg }
 
-    fun copyText(label: String, text: String) {
+    fun copyText(label: String, text: String, sensitive: Boolean = false) {
         val cm = getApplication<Application>()
             .getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        cm.setPrimaryClip(android.content.ClipData.newPlainText(label, text))
+        val clip = android.content.ClipData.newPlainText(label, text)
+        if (sensitive) {
+            clip.description.extras = android.os.PersistableBundle().apply {
+                putBoolean("android.content.extra.IS_SENSITIVE", true)
+            }
+        }
+        cm.setPrimaryClip(clip)
         toast("Copied $label")
     }
 
@@ -159,7 +165,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteHost(host: Host) {
         viewModelScope.launch {
             repo.deleteHost(host.id)
-                .onSuccess { toast("Deleted ${host.fqdn}"); loadHosts(); refreshDdns() }
+                .onSuccess {
+                    val targetId = "host-${host.id}"
+                    val hadTarget = ddnsConfig.getTargets().any { it.id == targetId }
+                    if (hadTarget) ddnsConfig.removeTarget(targetId)
+                    toast(if (hadTarget) "Deleted ${host.fqdn} and removed its DDNS target" else "Deleted ${host.fqdn}")
+                    loadHosts(); refreshDdns()
+                }
                 .onFailure { toast(it.message ?: "Failed to delete host") }
         }
     }
@@ -231,10 +243,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             targetHost = tunnel.targetHost ?: "localhost",
             targetPort = port,
         )
+        refreshTunnelsSoon()
     }
 
     fun disconnectTunnel(tunnel: Tunnel) {
         TunnelService.stop(getApplication(), tunnel.id)
+        refreshTunnelsSoon()
+    }
+
+    /** Re-fetch tunnels a few times so server-side connected state becomes visible. */
+    private fun refreshTunnelsSoon() {
+        viewModelScope.launch {
+            repeat(3) {
+                kotlinx.coroutines.delay(3000)
+                loadTunnels()
+            }
+        }
     }
 
     // ── Billing ──────────────────────────────────────────────────────────────
@@ -350,6 +374,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun addRslvdTarget(host: Host) {
         val key = host.updateKey
         if (key.isNullOrBlank()) { toast("This host has no update key"); return }
+        if (ddnsConfig.getTargets().any { it.id == "host-${host.id}" }) {
+            toast("${host.fqdn} is already a DDNS target")
+            return
+        }
         ddnsConfig.addTarget(
             DdnsTarget(
                 id = "host-${host.id}",
@@ -388,7 +416,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeTarget(id: String) {
+        val target = ddnsConfig.getTargets().find { it.id == id }
         ddnsConfig.removeTarget(id)
+        toast("Removed ${target?.label ?: "target"} from DDNS")
+        refreshDdns()
+    }
+
+    fun restoreTarget(target: DdnsTarget) {
+        ddnsConfig.addTarget(target)
         refreshDdns()
     }
 
@@ -396,6 +431,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (ddnsConfig.getTargets().isEmpty()) { toast("Add at least one DDNS target first"); return }
         DdnsScheduler.runNow(getApplication())
         toast("Updating now…")
+        viewModelScope.launch {
+            repeat(8) {
+                kotlinx.coroutines.delay(4000)
+                refreshDdns()
+            }
+            loadHosts()
+        }
+    }
+
+    fun deleteAccount(password: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            repo.deleteAccount(password)
+                .onSuccess { toast("Account deleted"); logout(); onDone(true) }
+                .onFailure { toast(it.message ?: "Failed to delete account"); onDone(false) }
+        }
     }
 }
 

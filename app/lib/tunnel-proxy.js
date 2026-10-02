@@ -58,6 +58,33 @@ const tokenToFqdn = new Map();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const DEVICE_ID_RE = /^[A-Za-z0-9._-]{8,128}$/;
+
+// Device-lock enforcement (trust-on-first-use).
+// Returns { ok: true } or { ok: false, error }. Binds the device on first
+// connect; afterwards only the bound device may use the token.
+async function checkDeviceBinding(row, deviceId, deviceName) {
+  if (!row.device_lock) return { ok: true };
+  if (!deviceId || !DEVICE_ID_RE.test(deviceId)) {
+    return { ok: false, error: 'device lock enabled — update your rslvd-tunnel client' };
+  }
+  if (!row.bound_device) {
+    const r = await pool.query(
+      `UPDATE tunnels SET bound_device = $1, bound_device_name = $2, bound_at = NOW()
+       WHERE id = $3 AND bound_device IS NULL RETURNING bound_device`,
+      [deviceId, (deviceName || '').slice(0, 100) || null, row.id]
+    );
+    if (r.rows[0]) {
+      log(`Device bound to tunnel ${row.fqdn}: ${deviceId}`);
+      return { ok: true };
+    }
+    const fresh = await pool.query('SELECT bound_device FROM tunnels WHERE id = $1', [row.id]);
+    row = { ...row, bound_device: fresh.rows[0] && fresh.rows[0].bound_device };
+  }
+  if (row.bound_device === deviceId) return { ok: true };
+  return { ok: false, error: 'device not authorized for this tunnel (device lock)' };
+}
+
 function log(...args) {
   console.log(`[tunnel-proxy]`, ...args);
 }
@@ -134,12 +161,15 @@ const tcpControlServer = net.createServer(async (conn) => {
     return;
   }
 
-  const token = helloLine.slice(6).trim();
+  const helloParts = helloLine.slice(6).trim().split(/\s+/);
+  const token = helloParts[0];
+  const deviceId = helloParts[1] || null;
+  const deviceName = helloParts.slice(2).join(' ') || null;
 
   let row;
   try {
     const result = await pool.query(
-      'SELECT id, fqdn, protocol, status FROM tunnels WHERE token = $1 AND active = TRUE',
+      'SELECT id, fqdn, protocol, status, device_lock, bound_device FROM tunnels WHERE token = $1 AND active = TRUE',
       [token]
     );
     row = result.rows[0];
@@ -151,6 +181,19 @@ const tcpControlServer = net.createServer(async (conn) => {
 
   if (!row) {
     sendLine(conn, 'ERR invalid token');
+    conn.destroy();
+    return;
+  }
+
+  try {
+    const bind = await checkDeviceBinding(row, deviceId, deviceName);
+    if (!bind.ok) {
+      sendLine(conn, `ERR ${bind.error}`);
+      conn.destroy();
+      return;
+    }
+  } catch (e) {
+    sendLine(conn, 'ERR database error');
     conn.destroy();
     return;
   }
@@ -325,12 +368,15 @@ udpControlSocket.on('message', async (msg, rinfo) => {
 
   if (!msgStr.startsWith('HELLO ')) return;
 
-  const token = msgStr.slice(6).trim();
+  const udpParts = msgStr.slice(6).trim().split(/\s+/);
+  const token = udpParts[0];
+  const udpDeviceId = udpParts[1] || null;
+  const udpDeviceName = udpParts.slice(2).join(' ') || null;
 
   let row;
   try {
     const result = await pool.query(
-      'SELECT id, fqdn, protocol, tunnel_port FROM tunnels WHERE token = $1 AND active = TRUE',
+      'SELECT id, fqdn, protocol, tunnel_port, device_lock, bound_device FROM tunnels WHERE token = $1 AND active = TRUE',
       [token]
     );
     row = result.rows[0];
@@ -341,6 +387,17 @@ udpControlSocket.on('message', async (msg, rinfo) => {
 
   if (!row) {
     udpControlSocket.send('ERR invalid token\n', rinfo.port, rinfo.address);
+    return;
+  }
+
+  try {
+    const bind = await checkDeviceBinding(row, udpDeviceId, udpDeviceName);
+    if (!bind.ok) {
+      udpControlSocket.send(`ERR ${bind.error}\n`, rinfo.port, rinfo.address);
+      return;
+    }
+  } catch (e) {
+    udpControlSocket.send('ERR database\n', rinfo.port, rinfo.address);
     return;
   }
 
@@ -544,7 +601,7 @@ dns2tcpSocket.on('message', async (msg, rinfo) => {
     let row;
     try {
       const result = await pool.query(
-        'SELECT id, fqdn, tunnel_port FROM tunnels WHERE token = $1 AND active = TRUE',
+        'SELECT id, fqdn, tunnel_port, device_lock FROM tunnels WHERE token = $1 AND active = TRUE',
         [token]
       );
       row = result.rows[0];
@@ -552,6 +609,11 @@ dns2tcpSocket.on('message', async (msg, rinfo) => {
       return;
     }
     if (!row) return;
+    // DNS2TCP queries can't carry a device fingerprint — locked tunnels must use TCP/UDP
+    if (row.device_lock) {
+      log(`DNS2TCP registration refused for ${row.fqdn}: device lock enabled`);
+      return;
+    }
 
     const fqdn = row.fqdn;
     const tunnelPort = row.tunnel_port;
@@ -668,4 +730,13 @@ function startTunnelProxy() {
   tcpPublicServer.on('error',  (e) => log(`TCP Public server error: ${e.message}`));
 }
 
-module.exports = { startTunnelProxy };
+// Live check: is a tunnel agent currently attached for this fqdn?
+function isConnected(fqdn) {
+  if (clients.has(fqdn)) return true;
+  for (const s of dns2tcpSessions.values()) {
+    if (s.fqdn === fqdn) return true;
+  }
+  return false;
+}
+
+module.exports = { startTunnelProxy, isConnected };

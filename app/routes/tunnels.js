@@ -4,8 +4,10 @@ const pool = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
 const ionos = require('../lib/ionos');
 const activity = require('../lib/activity');
+const dnsAudit = require('../lib/dns-audit');
 const tunnelCert = require('../lib/tunnel-cert');
 const { activeBonus } = require('../lib/plans');
+const tunnelProxy = require('../lib/tunnel-proxy');
 
 const PORT_MIN = 20000;
 const PORT_MAX = 29999;
@@ -34,11 +36,12 @@ router.use(requireAuth);
 router.get('/', async (req, res) => {
   const result = await pool.query(
     `SELECT id, name, tunnel_port, target_host, target_port, protocol,
-            status, fqdn, token, active, created_at, parent_tunnel_id, force_https
+            status, fqdn, token, active, created_at, parent_tunnel_id, force_https,
+            device_lock, bound_device_name, bound_at
      FROM tunnels WHERE user_id = $1 ORDER BY parent_tunnel_id NULLS FIRST, created_at DESC`,
     [req.user.id]
   );
-  res.json(result.rows);
+  res.json(result.rows.map((t) => ({ ...t, connected: tunnelProxy.isConnected(t.fqdn) })));
 });
 
 // ── Create tunnel ────────────────────────────────────────────────────────────
@@ -118,6 +121,7 @@ router.post('/', async (req, res) => {
       }
 
       activity.log('tunnel.create', { userId: user.id, detail: fqdn, req });
+      dnsAudit.record({ userId: user.id, tunnelId: result.rows[0].id, fqdn, change: 'tunnel_created', req });
       return res.status(201).json({ ...result.rows[0], parent_fqdn: parent.fqdn });
     }
 
@@ -174,6 +178,7 @@ router.post('/', async (req, res) => {
     if (!wantHttps) tunnelCert.enableHttpFallback(fqdn);
 
     activity.log('tunnel.create', { userId: user.id, detail: fqdn, req });
+    dnsAudit.record({ userId: user.id, tunnelId: result.rows[0].id, fqdn, change: 'tunnel_created', req });
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -215,6 +220,7 @@ router.delete('/:id', async (req, res) => {
     tunnelCert.disableHttpFallback(t.fqdn);
 
     activity.log('tunnel.delete', { userId: req.user.id, detail: t.fqdn, req });
+    dnsAudit.record({ userId: req.user.id, fqdn: t.fqdn, change: 'tunnel_deleted', req });
     await pool.query('DELETE FROM tunnels WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
@@ -243,10 +249,53 @@ router.patch('/:id/https', async (req, res) => {
     }
 
     activity.log('tunnel.https_toggle', { userId: req.user.id, detail: `${t.fqdn} \u2192 ${force_https ? 'on' : 'off'}`, req });
+    dnsAudit.record({ userId: req.user.id, tunnelId: t.id, fqdn: t.fqdn, change: force_https ? 'https_enabled' : 'https_disabled', req });
     res.json({ force_https });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to toggle HTTPS' });
+  }
+});
+
+// ── Toggle device lock ──────────────────────────────────────────────────
+router.patch('/:id/device-lock', async (req, res) => {
+  try {
+    const { device_lock } = req.body;
+    if (typeof device_lock !== 'boolean') return res.status(400).json({ error: 'device_lock must be a boolean' });
+
+    const result = await pool.query('SELECT id, fqdn FROM tunnels WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    const t = result.rows[0];
+    if (!t) return res.status(404).json({ error: 'Tunnel not found' });
+
+    if (device_lock) {
+      await pool.query('UPDATE tunnels SET device_lock = TRUE WHERE id = $1', [t.id]);
+    } else {
+      await pool.query(
+        'UPDATE tunnels SET device_lock = FALSE, bound_device = NULL, bound_device_name = NULL, bound_at = NULL WHERE id = $1',
+        [t.id]
+      );
+    }
+
+    activity.log('tunnel.device_lock', { userId: req.user.id, detail: `${t.fqdn} \u2192 ${device_lock ? 'on' : 'off'}`, req });
+    res.json({ device_lock });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to toggle device lock' });
+  }
+});
+
+// ── Reset device binding (keeps lock enabled; next device to connect binds) ──
+router.post('/:id/reset-device', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, fqdn FROM tunnels WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    const t = result.rows[0];
+    if (!t) return res.status(404).json({ error: 'Tunnel not found' });
+
+    await pool.query('UPDATE tunnels SET bound_device = NULL, bound_device_name = NULL, bound_at = NULL WHERE id = $1', [t.id]);
+    activity.log('tunnel.device_reset', { userId: req.user.id, detail: t.fqdn, req });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset device binding' });
   }
 });
 

@@ -99,6 +99,9 @@ class Repository private constructor(
 
     suspend fun escalateTicket(id: Int): Result<SupportTicket> = call { api.escalateTicket(id) }
 
+    suspend fun deleteAccount(password: String): Result<Unit> =
+        callUnit { api.deleteAccount(DeleteAccountRequest(password)) }
+
     fun logout() = tokenStore.clear()
 
     fun isLoggedIn() = tokenStore.isLoggedIn()

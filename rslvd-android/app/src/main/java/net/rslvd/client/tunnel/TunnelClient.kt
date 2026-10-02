@@ -25,6 +25,8 @@ class TunnelClient(
     private val targetHost: String,
     private val targetPort: Int,
     private val protocol: String,
+    private val deviceId: String,
+    private val deviceName: String,
     private val onStatus: (String) -> Unit,
 ) {
     companion object {
@@ -89,7 +91,7 @@ class TunnelClient(
         val control = Socket()
         control.connect(InetSocketAddress(SERVER_HOST, TCP_CONTROL_PORT), 10_000)
         control.use { conn ->
-            conn.writeLine("HELLO $token")
+            conn.writeLine("HELLO $token $deviceId $deviceName")
             val resp = readLine(conn, 10_000)
             if (resp.startsWith("ERR ")) throw IOException(resp.removePrefix("ERR "))
             if (!resp.trim().startsWith("OK")) throw IOException("unexpected response: $resp")
@@ -159,7 +161,7 @@ class TunnelClient(
         val data = DatagramSocket()
         try {
             control.connect(serverAddr, UDP_CONTROL_PORT)
-            control.sendText("HELLO $token")
+            control.sendText("HELLO $token $deviceId $deviceName")
             val reg = control.receiveText(5_000)
             if (!reg.startsWith("OK")) throw IOException("registration failed: $reg")
 
