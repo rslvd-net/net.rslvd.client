@@ -26,28 +26,6 @@ android {
         vectorDrawables { useSupportLibrary true }
     }
 
-    flavorDimensions = ['dist']
-    productFlavors {
-        play {
-            dimension 'dist'
-            // Play Store build: keeps the sandboxed /system/bin/sh shell only.
-            buildConfigField 'boolean', 'BOOTSTRAP_ENABLED', 'false'
-        }
-        full {
-            dimension 'dist'
-            // Sideload build with the Termux-style bootstrap environment. The
-            // package name must be net.rslvd.debug because the repo binaries
-            // are compiled with prefix /data/data/net.rslvd.debug/files/usr.
-            applicationId 'net.rslvd.debug'
-            // targetSdk 28 so the app may exec downloaded binaries from its
-            // data dir (Android 10+ W^X blocks this for targetSdk >= 29 —
-            // same reason Termux's sideload build targets 28).
-            targetSdk 28
-            buildConfigField 'boolean', 'BOOTSTRAP_ENABLED', 'true'
-        }
-    }
-
-
     if (hasKeystore) {
         signingConfigs {
             release {

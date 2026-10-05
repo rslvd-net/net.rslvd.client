@@ -10,11 +10,10 @@ import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
-import net.rslvd.client.BuildConfig
 import java.io.File
 
 /**
- * Owns the single PTY-backed shell session for the app. The session outlives
+ * Owns the single PTY-backed /system/bin/sh session for the app. The session outlives
  * the Shell tab's composition so switching tabs does not kill running programs;
  * a [TerminalView] attaches/detaches as the UI comes and goes.
  */
@@ -34,9 +33,6 @@ class TerminalHost private constructor(private val app: Context) : TerminalSessi
     var session: TerminalSession = create()
         private set
 
-    val usingBootstrap: Boolean
-        get() = BuildConfig.BOOTSTRAP_ENABLED && BootstrapInstaller.isInstalled(app)
-
     fun restart() {
         session.finishIfRunning()
         session = create()
@@ -45,31 +41,15 @@ class TerminalHost private constructor(private val app: Context) : TerminalSessi
     }
 
     private fun create(): TerminalSession {
-        val shell: String
-        val cwd: String
-        val env: MutableMap<String, String>
-        val login: String
-        if (usingBootstrap) {
-            val prefix = BootstrapInstaller.prefixDir(app)
-            shell = listOf("bin/bash", "bin/sh", "bin/dash")
-                .map { File(prefix, it) }
-                .firstOrNull { it.exists() }
-                ?.absolutePath ?: "/system/bin/sh"
-            env = BootstrapInstaller.environment(app).toMutableMap()
-            cwd = env["HOME"] ?: app.filesDir.absolutePath
-            login = "-l"
-        } else {
-            shell = "/system/bin/sh"
-            cwd = app.filesDir.absolutePath
-            env = sandboxEnvironment()
-            login = ""
-        }
+        val shell = "/system/bin/sh"
+        val cwd = app.filesDir.absolutePath
+        val env = sandboxEnvironment()
         File(cwd).mkdirs()
         env["COLORTERM"] = "truecolor"
-        env["RSLVD_BANNER"] = banner()
+        env["RSLVD_BANNER"] = BANNER
         val envArray = env.map { (k, v) -> "$k=$v" }.toTypedArray()
         // Print the banner, then become the interactive shell (keeps the PTY as pid's stdio).
-        val args = arrayOf(shell, "-c", "printf '%s' \"\$RSLVD_BANNER\"; unset RSLVD_BANNER; exec \"$shell\" $login")
+        val args = arrayOf(shell, "-c", "printf '%s' \"\$RSLVD_BANNER\"; unset RSLVD_BANNER; exec \"$shell\"")
         return TerminalSession(shell, cwd, args, envArray, TRANSCRIPT_ROWS, this)
     }
 
@@ -84,14 +64,6 @@ class TerminalHost private constructor(private val app: Context) : TerminalSessi
         )
         for (k in PASSTHROUGH) System.getenv(k)?.let { env[k] = it }
         return env
-    }
-
-    private fun banner(): String = if (usingBootstrap) {
-        "rslvd shell \u2014 bootstrap environment (\$PREFIX)\n" +
-            "Try: pkg install <name> \u00b7 nano \u00b7 nmap \u00b7 dig \u00b7 nc\n\n"
-    } else {
-        "rslvd shell \u2014 /system/bin/sh (app sandbox)\n" +
-            "Try: ping -c 4 rslvd.net \u00b7 ip addr \u00b7 netstat \u00b7 getprop\n\n"
     }
 
     // ---- TerminalSessionClient ----
@@ -146,6 +118,9 @@ class TerminalHost private constructor(private val app: Context) : TerminalSessi
     companion object {
         private const val TAG = "TerminalHost"
         private const val TRANSCRIPT_ROWS = 4000
+        private const val BANNER = "rslvd shell \u2014 /system/bin/sh (app sandbox)\n" +
+            "Try: ping -c 4 rslvd.net \u00b7 ip addr \u00b7 netstat \u00b7 getprop\n" +
+            "Want bash, pkg/apt, nmap, nano\u2026? Get rslvd Terminal: https://rslvd.net/rslvd-terminal.apk\n\n"
 
         private val PASSTHROUGH = listOf(
             "ANDROID_DATA", "ANDROID_ROOT", "ANDROID_ART_ROOT", "ANDROID_I18N_ROOT",

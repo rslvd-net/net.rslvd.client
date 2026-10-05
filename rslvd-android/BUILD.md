@@ -3,9 +3,9 @@
 ## Prerequisites
 
 - **JDK 17**
-- **Android SDK 34** with build-tools `34.0.0`; export `ANDROID_HOME` (or set
+- **Android SDK 36** + NDK `27.2.12479018` (for the terminal's PTY helper); export `ANDROID_HOME` (or set
   `sdk.dir` in `local.properties`).
-- Gradle is provided via the wrapper (`./gradlew`, Gradle 8.2.1, AGP 8.2.1).
+- Gradle is provided via the wrapper (`./gradlew`, Gradle 8.11.1, AGP 8.9.2).
 
 ## Debug build
 
@@ -15,8 +15,8 @@
 
 Output: `app/build/outputs/apk/debug/app-debug.apk`
 
-- `applicationId` is `net.rslvd.client.debug` (so it installs alongside a release
-  build) and `versionName` carries a `-debug` suffix.
+- Same `applicationId` (`net.rslvd.client`) as release; `versionName` carries a
+  `-debug` suffix.
 - Signed with the standard Android debug keystore — install with
   `adb install app/build/outputs/apk/debug/app-debug.apk` or by sideloading.
 
@@ -52,7 +52,7 @@ compiles, but **Play Store uploads must be signed with a real upload key**.
 Verify a release artifact is signed:
 
 ```bash
-$ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs \
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs \
   app/build/outputs/apk/release/app-release.apk
 ```
 
