@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,7 +26,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,11 +41,6 @@ import com.termux.terminal.KeyHandler
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import net.rslvd.client.BuildConfig
-import net.rslvd.client.shell.BootstrapInstaller
 import net.rslvd.client.shell.TerminalHost
 
 /**
@@ -58,14 +51,6 @@ import net.rslvd.client.shell.TerminalHost
 @Composable
 fun TerminalScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current.applicationContext
-
-    if (BuildConfig.BOOTSTRAP_ENABLED) {
-        var installed by remember { mutableStateOf(BootstrapInstaller.isInstalled(context)) }
-        if (!installed) {
-            BootstrapInstallScreen(modifier, context) { installed = true }
-            return
-        }
-    }
 
     val host = remember { TerminalHost.get(context) }
     val density = LocalDensity.current.density
@@ -265,57 +250,3 @@ private const val TERMINAL_BG_INT = 0xFF0A0A0F.toInt()
 private const val DEFAULT_FONT_SP = 13
 private const val MIN_FONT_SP = 7
 private const val MAX_FONT_SP = 36
-
-@Composable
-private fun BootstrapInstallScreen(
-    modifier: Modifier,
-    context: Context,
-    onInstalled: () -> Unit,
-) {
-    var status by remember { mutableStateOf<String?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(24.dp),
-        ) {
-            Text("Shell environment", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "Install the rslvd shell environment — a full Linux userland with " +
-                    "pkg/apt, dpkg, netcat, nmap, dig and more, served from repo.rslvd.net. " +
-                    "One-time download (~65 MB) into the app's private storage.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (busy) {
-                CircularProgressIndicator()
-                Text(status ?: "Working…", style = MaterialTheme.typography.bodySmall)
-            } else {
-                Button(onClick = {
-                    busy = true
-                    error = null
-                    scope.launch {
-                        try {
-                            withContext(Dispatchers.IO) {
-                                BootstrapInstaller.install(context) { status = it }
-                            }
-                            onInstalled()
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            error = e.message ?: "Install failed"
-                        } finally {
-                            busy = false
-                        }
-                    }
-                }) { Text("Install environment") }
-            }
-            error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}

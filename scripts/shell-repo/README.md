@@ -1,6 +1,7 @@
 # rslvd shell package repository (repo.rslvd.net)
 
-Packages and the first-run bootstrap used by the full Android build
+Packages and the first-run bootstrap used by the rslvd Terminal app
+([igaret/rslvd-terminal](https://github.com/igaret/rslvd-terminal))
 (`net.rslvd.debug`) are built from a fork of
 [termux-packages](https://github.com/termux/termux-packages) with prefix
 `/data/data/net.rslvd.debug/files/usr`.

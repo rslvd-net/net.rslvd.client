@@ -22,10 +22,11 @@ No WebView — it talks directly to the rslvd REST API.
     the `{ip}` token (Google Domains, No-IP, DuckDNS, Cloudflare via a worker, etc.).
   - Reschedules after reboot (`BootReceiver`) and posts a status notification.
 - **Shell** — a real terminal: native PTY (`forkpty` via JNI) + xterm-256color
-  emulator, so `nano`, `vim`, `top`, `less`, readline history and ANSI colours all
-  work. Extra-keys row for ESC/TAB/CTRL/ALT/arrows/Home/End/PgUp/PgDn/Del. The
-  Play flavour runs the sandboxed `/system/bin/sh`; the full flavour
-  (`net.rslvd.debug`) runs bash from the bootstrap `$PREFIX`.
+  emulator running the sandboxed `/system/bin/sh` (`ping`, `ip`, `netstat`,
+  `getprop`…). Extra-keys row for ESC/TAB/CTRL/ALT/arrows/Home/End/PgUp/PgDn/Del.
+  The full Termux-style environment (bash, pkg/apt, nmap, nano…) is a separate
+  sideload app, [rslvd Terminal](https://github.com/igaret/rslvd-terminal)
+  (`net.rslvd.debug`), since Play policy forbids downloading executable code.
 
 ## Architecture
 
