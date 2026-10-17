@@ -1,4 +1,20 @@
-# RSLVD
+# **Running a home lab behind CGNAT?**
+ 
+###### If you've ever tried to access a service running at home from outside your network, you know how frustrating networking limitations can be.
+ 
+###### I'm working on **RSLVD.net**, a project focused on Dynamic DNS and CGNAT tunneling.
+ 
+*** I'm looking to connect with home-lab enthusiasts, self-hosters, and developers who want to make their services reachable.
+ 
+I'd love to hear:
+ 
+- What are you running at home?
+- What is your biggest remote-access challenge?
+- What would make a tool like this genuinely useful to you?
+
+Check it out: https://rslvd.net/
+
+# RSLVD.NET
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-22+-green.svg)](https://nodejs.org/)
@@ -1082,7 +1098,8 @@ MIT License - See [LICENSE](LICENSE) file
 ## Support
 
 - **Issues:** [GitHub Issues](https://github.com/yourusername/rslvd.net/issues)
-- **Email:** admin@rslvd.net
+- **Email:** admin@rslvd.net support@rslvd.net *@rslvd.net
+
 - **Documentation:** This README and inline code comments
 
 ---
