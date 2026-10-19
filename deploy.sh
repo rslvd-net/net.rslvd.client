@@ -38,8 +38,8 @@ sudo systemctl restart rslvd
 
 echo "==> Configuring nginx"
 sudo mkdir -p /etc/nginx/conf.d/rslvd-http
-sudo cp /tmp/rslvd-app/nginx-http.conf /etc/nginx/sites-available/rslvd.net
-sudo ln -sf /etc/nginx/sites-available/rslvd.net /etc/nginx/sites-enabled/rslvd.net
+sudo cp /tmp/rslvd-app/nginx-http.conf /etc/nginx/sites-available/rslvd.privatedns.org
+sudo ln -sf /etc/nginx/sites-available/rslvd.privatedns.org /etc/nginx/sites-enabled/rslvd.privatedns.org
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
@@ -47,14 +47,14 @@ echo "==> Requesting wildcard SSL certificate (DNS-01 via IONOS)"
 sudo certbot certonly --manual --preferred-challenges=dns \
   --manual-auth-hook=/opt/rslvd/certbot-hooks/ionos-auth.sh \
   --manual-cleanup-hook=/opt/rslvd/certbot-hooks/ionos-cleanup.sh \
-  -d "rslvd.net" -d "*.rslvd.net" \
-  --non-interactive --agree-tos --email admin@rslvd.net \
-  --cert-name rslvd.net \
+  -d "rslvd.privatedns.org" -d "*.rslvd.privatedns.org" \
+  --non-interactive --agree-tos --email admin@rslvd.privatedns.org \
+  --cert-name rslvd.privatedns.org \
   --deploy-hook=/opt/rslvd/certbot-hooks/renew-deploy.sh \
   || echo "Wildcard cert already exists or failed - check manually"
 
 echo "==> Updating nginx with full SSL config"
-sudo cp /tmp/rslvd-nginx/nginx-rslvd.conf /etc/nginx/sites-available/rslvd.net
+sudo cp /tmp/rslvd-nginx/nginx-rslvd.conf /etc/nginx/sites-available/rslvd.privatedns.org
 sudo nginx -t && sudo systemctl reload nginx
 
 echo "==> Setting up certbot renewal timer"
@@ -83,6 +83,6 @@ sleep 2
 sudo systemctl status rslvd --no-pager
 
 echo ""
-echo "✓ Deployment complete! https://rslvd.net"
+echo "✓ Deployment complete! https://rslvd.privatedns.org"
 echo "  Nested subdomains will auto-provision SSL certs via DNS-01."
 echo "  HTTP fallback active for nested subdomains while certs provision."

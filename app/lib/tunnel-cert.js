@@ -6,11 +6,11 @@ const ENABLE_HTTP_SCRIPT = '/opt/rslvd/scripts/enable-http-fallback.sh';
 const DISABLE_HTTP_SCRIPT = '/opt/rslvd/scripts/disable-http-fallback.sh';
 
 // A nested tunnel FQDN has more labels than "<single-level>.<base>".
-// e.g. base = rslvd.net (2 labels). Single-level = name.rslvd.net (3 labels,
-// covered by the *.rslvd.net wildcard cert). Nested = sub.name.rslvd.net (4+),
+// e.g. base = rslvd.privatedns.org (2 labels). Single-level = name.rslvd.privatedns.org (3 labels,
+// covered by the *.rslvd.privatedns.org wildcard cert). Nested = sub.name.rslvd.privatedns.org (4+),
 // which is NOT covered by the wildcard and needs its own cert.
 function isNested(fqdn) {
-  const base = process.env.BASE_DOMAIN || 'rslvd.net';
+  const base = process.env.BASE_DOMAIN || 'rslvd.privatedns.org';
   const baseLabels = base.split('.').length;
   return fqdn.split('.').length > baseLabels + 1;
 }

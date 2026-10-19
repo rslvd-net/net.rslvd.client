@@ -1,16 +1,16 @@
 #!/bin/sh
 # rslvd-tunnel installer for DD-WRT
 # Run from the router shell (SSH in first):
-#   curl -fsSL https://rslvd.net/install-ddwrt.sh | sh
+#   curl -fsSL https://rslvd.privatedns.org/install-ddwrt.sh | sh
 # or:
-#   wget -qO- https://rslvd.net/install-ddwrt.sh | sh
+#   wget -qO- https://rslvd.privatedns.org/install-ddwrt.sh | sh
 #
 # DD-WRT persistent storage options (fastest to slowest):
 #   1. JFFS2 partition (/jffs) — enable under Administration > JFFS2 Support
 #   2. USB drive mounted at /opt via Optware/Entware
 #   3. /tmp — volatile, lost on reboot
 
-BASE_URL="https://rslvd.net/dl"
+BASE_URL="https://rslvd.privatedns.org/dl"
 
 echo ""
 echo "  rslvd-tunnel installer for DD-WRT"
@@ -114,5 +114,5 @@ echo ""
 echo "  Example (expose router admin UI on port 80):"
 echo "    $BINARY abc123... 80"
 echo ""
-echo "  Get your token from: https://rslvd.net/dashboard"
+echo "  Get your token from: https://rslvd.privatedns.org/dashboard"
 echo ""

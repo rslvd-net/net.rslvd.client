@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Expose a Home Server to the Internet Without Port Forwarding — rslvd.net</title>
+  <title>Expose a Home Server to the Internet Without Port Forwarding — rslvd.privatedns.org</title>
   <meta name="description" content="Make Home Assistant, Plex, Nextcloud, Minecraft, or any self-hosted service reachable from anywhere — free, with HTTPS, no port forwarding, no public IP required." />
-  <link rel="canonical" href="https://rslvd.net/expose-home-server" />
+  <link rel="canonical" href="https://rslvd.privatedns.org/expose-home-server" />
   <meta property="og:type" content="article" />
-  <meta property="og:url" content="https://rslvd.net/expose-home-server" />
-  <meta property="og:title" content="Expose a Home Server Without Port Forwarding — rslvd.net" />
+  <meta property="og:url" content="https://rslvd.privatedns.org/expose-home-server" />
+  <meta property="og:title" content="Expose a Home Server Without Port Forwarding — rslvd.privatedns.org" />
   <meta property="og:description" content="Home Assistant, Plex, Nextcloud, Minecraft — reachable from anywhere, free, with HTTPS. No port forwarding or public IP required." />
-  <meta property="og:image" content="https://rslvd.net/icons/icon-512.png" />
+  <meta property="og:image" content="https://rslvd.privatedns.org/icons/icon-512.png" />
   <link rel="icon" href="/icons/icon-192.png" />
   <link rel="stylesheet" href="/landing.css" />
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
     {"@type":"Question","name":"Do I need to open ports on my router?","acceptedAnswer":{"@type":"Answer","text":"No. The rslvd tunnel client makes an outbound connection from your network, so no port forwarding, UPnP, or firewall changes are needed."}},
-    {"@type":"Question","name":"Can I expose non-web services like Minecraft or SSH?","acceptedAnswer":{"@type":"Answer","text":"Yes. rslvd.net supports raw TCP and UDP tunnels with a dedicated public port, so game servers, SSH, RDP, and VoIP all work."}},
+    {"@type":"Question","name":"Can I expose non-web services like Minecraft or SSH?","acceptedAnswer":{"@type":"Answer","text":"Yes. rslvd.privatedns.org supports raw TCP and UDP tunnels with a dedicated public port, so game servers, SSH, RDP, and VoIP all work."}},
     {"@type":"Question","name":"Is HTTPS included?","acceptedAnswer":{"@type":"Answer","text":"Yes. Let's Encrypt certificates are issued and renewed automatically for your subdomain — visitors get a padlock with zero configuration."}}
   ]}
   </script>
@@ -25,12 +25,12 @@
   <nav><a href="/" class="logo">rslvd<span>.net</span></a><div><a href="/pricing">Pricing</a><a href="/tutorials">Tutorials</a><a href="/register" class="cta">Sign up free</a></div></nav>
   <main>
     <h1>Expose your home server — no port forwarding, no public IP</h1>
-    <p class="lead">Self-hosting is easy until you want access from outside. Port forwarding is fiddly, risky, and impossible behind CGNAT. <strong>rslvd.net</strong> puts your service on a permanent <code>yourname.rslvd.net</code> URL with automatic HTTPS, free.</p>
+    <p class="lead">Self-hosting is easy until you want access from outside. Port forwarding is fiddly, risky, and impossible behind CGNAT. <strong>rslvd.privatedns.org</strong> puts your service on a permanent <code>yourname.rslvd.privatedns.org</code> URL with automatic HTTPS, free.</p>
 
     <h2>Works with everything you self-host</h2>
     <table>
       <tr><th>Service</th><th>Tunnel type</th><th>Result</th></tr>
-      <tr><td>Home Assistant</td><td>HTTP</td><td><code>https://ha-yourname.rslvd.net</code></td></tr>
+      <tr><td>Home Assistant</td><td>HTTP</td><td><code>https://ha-yourname.rslvd.privatedns.org</code></td></tr>
       <tr><td>Nextcloud / Jellyfin / Plex</td><td>HTTP</td><td>Streaming &amp; sync from anywhere</td></tr>
       <tr><td>Minecraft / Valheim</td><td>TCP / UDP</td><td>Friends join via your subdomain + port</td></tr>
       <tr><td>SSH / RDP</td><td>TCP</td><td>Remote admin without a VPN</td></tr>
@@ -38,8 +38,8 @@
     </table>
 
     <h2>Two ways to connect</h2>
-    <p><strong>1. Have a public IP?</strong> Use free dynamic DNS: point <code>yourname.rslvd.net</code> at your home IP with the standard router DDNS protocol, our <a href="/tutorials">setup scripts</a>, or the <a href="/downloads">Android app</a>. Then forward the port as usual.</p>
-    <p><strong>2. Behind CGNAT or don't want to open ports?</strong> Use a reverse tunnel: run the lightweight tunnel client inside your network and it dials out to rslvd.net — <a href="/ddns-for-cgnat">no inbound ports needed at all</a>. HTTPS certificates are issued automatically either way.</p>
+    <p><strong>1. Have a public IP?</strong> Use free dynamic DNS: point <code>yourname.rslvd.privatedns.org</code> at your home IP with the standard router DDNS protocol, our <a href="/tutorials">setup scripts</a>, or the <a href="/downloads">Android app</a>. Then forward the port as usual.</p>
+    <p><strong>2. Behind CGNAT or don't want to open ports?</strong> Use a reverse tunnel: run the lightweight tunnel client inside your network and it dials out to rslvd.privatedns.org — <a href="/ddns-for-cgnat">no inbound ports needed at all</a>. HTTPS certificates are issued automatically either way.</p>
 
     <h2>Set up in about two minutes</h2>
     <ol>

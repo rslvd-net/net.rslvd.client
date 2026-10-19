@@ -123,13 +123,13 @@ async function reconcilePending() {
         continue;
       }
       if (intent.kind === 'donation') {
-        const payment = await executeIntent(intent, 'rslvd.net donation (reconciled)');
+        const payment = await executeIntent(intent, 'rslvd.privatedns.org donation (reconciled)');
         const bonus = await applyDonation(intent, payment);
         console.log(`Billing: reconciled donation intent ${intent.id} — bonus applied through ${bonus.expires.toISOString()}`);
         continue;
       }
       const planInfo = PLANS[intent.plan];
-      const payment = await executeIntent(intent, `rslvd.net ${planInfo ? planInfo.label : intent.plan} plan (reconciled)`);
+      const payment = await executeIntent(intent, `rslvd.privatedns.org ${planInfo ? planInfo.label : intent.plan} plan (reconciled)`);
       const expires = await applyIntent(intent, payment);
       console.log(`Billing: reconciled payment intent ${intent.id} — plan ${intent.plan} applied through ${expires.toISOString()}`);
     } catch (err) {

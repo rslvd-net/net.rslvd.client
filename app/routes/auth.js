@@ -41,9 +41,9 @@ router.post('/register', async (req, res) => {
     try {
       await sendMail({
         to: user.email,
-        subject: 'Verify your rslvd.net email',
-        text: `Welcome to rslvd.net!\n\nPlease verify your email address by clicking the link below (expires in 24 hours):\n\n${verifyUrl}\n\nIf you didn't create this account, ignore this email.`,
-        html: `<p>Welcome to rslvd.net!</p><p>Please verify your email address:</p><p><a href="${verifyUrl}" style="font-size:16px;font-weight:bold">Verify my email →</a></p><p style="color:#888;font-size:13px">This link expires in 24 hours. If you didn't create this account, ignore this email.</p>`,
+        subject: 'Verify your rslvd.privatedns.org email',
+        text: `Welcome to rslvd.privatedns.org!\n\nPlease verify your email address by clicking the link below (expires in 24 hours):\n\n${verifyUrl}\n\nIf you didn't create this account, ignore this email.`,
+        html: `<p>Welcome to rslvd.privatedns.org!</p><p>Please verify your email address:</p><p><a href="${verifyUrl}" style="font-size:16px;font-weight:bold">Verify my email →</a></p><p style="color:#888;font-size:13px">This link expires in 24 hours. If you didn't create this account, ignore this email.</p>`,
       });
     } catch (mailErr) {
       console.error('Verification email failed:', mailErr.message);
@@ -168,7 +168,7 @@ router.patch('/profile', require('../middleware/auth').requireAuth, async (req, 
 // ── 2FA: begin setup ──────────────────────────────────────────────────────────────
 router.post('/2fa/setup', require('../middleware/auth').requireAuth, async (req, res) => {
   try {
-    const secret = speakeasy.generateSecret({ name: `rslvd.net (${req.user.email})`, issuer: 'rslvd.net', length: 20 });
+    const secret = speakeasy.generateSecret({ name: `rslvd.privatedns.org (${req.user.email})`, issuer: 'rslvd.privatedns.org', length: 20 });
     await pool.query('UPDATE users SET totp_pending_secret = $1 WHERE id = $2', [secret.base32, req.user.id]);
     res.json({
       secret: secret.base32,
@@ -267,9 +267,9 @@ router.post('/forgot-password', async (req, res) => {
     const resetUrl = `${process.env.APP_URL}/reset-password?token=${token}`;
     await sendMail({
       to: user.email,
-      subject: 'Reset your rslvd.net password',
+      subject: 'Reset your rslvd.privatedns.org password',
       text: `You requested a password reset.\n\nClick the link below to set a new password (expires in 1 hour):\n\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
-      html: `<p>You requested a password reset for your rslvd.net account.</p><p><a href="${resetUrl}" style="font-size:16px;font-weight:bold">Reset my password →</a></p><p style="color:#888;font-size:13px">This link expires in 1 hour. If you didn't request this, ignore this email.</p>`,
+      html: `<p>You requested a password reset for your rslvd.privatedns.org account.</p><p><a href="${resetUrl}" style="font-size:16px;font-weight:bold">Reset my password →</a></p><p style="color:#888;font-size:13px">This link expires in 1 hour. If you didn't request this, ignore this email.</p>`,
     });
 
     res.json({ ok: true });
@@ -345,7 +345,7 @@ router.post('/resend-verification', require('../middleware/auth').requireAuth, a
     const verifyUrl = `${process.env.APP_URL}/verify-email?token=${verifyToken}`;
     await sendMail({
       to: u.email,
-      subject: 'Verify your rslvd.net email',
+      subject: 'Verify your rslvd.privatedns.org email',
       text: `Please verify your email address by clicking the link below (expires in 24 hours):\n\n${verifyUrl}`,
       html: `<p>Please verify your email address:</p><p><a href="${verifyUrl}" style="font-size:16px;font-weight:bold">Verify my email \u2192</a></p><p style="color:#888;font-size:13px">This link expires in 24 hours.</p>`,
     });

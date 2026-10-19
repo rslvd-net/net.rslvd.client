@@ -4,7 +4,7 @@ set -euo pipefail
 
 API_KEY=$(grep '^IONOS_API_KEY=' /opt/rslvd/.env | cut -d= -f2- | tr -d '"' | tr -d "'")
 BASE="https://api.hosting.ionos.com/dns/v1"
-ZONE="rslvd.net"
+ZONE="rslvd.privatedns.org"
 NAME="_acme-challenge.${CERTBOT_DOMAIN#\*.}"
 
 ZONE_ID=$(curl -sf -H "X-API-Key: $API_KEY" "$BASE/zones" \

@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "=== rslvd.net smoke test ==="
+echo "=== rslvd.privatedns.org smoke test ==="
 
 # Login as site owner
 CREDS_FILE=/opt/rslvd/owner-credentials.txt
@@ -7,7 +7,7 @@ PASS=$(grep 'password:' $CREDS_FILE | awk '{print $2}')
 echo "Testing login as garet@email.com..."
 
 echo "{\"email\":\"garet@email.com\",\"password\":\"$PASS\"}" > /tmp/login.json
-RESP=$(curl -s -X POST https://rslvd.net/api/auth/login -H "Content-Type: application/json" -d @/tmp/login.json)
+RESP=$(curl -s -X POST https://rslvd.privatedns.org/api/auth/login -H "Content-Type: application/json" -d @/tmp/login.json)
 echo "Login response: $RESP" | head -c 200
 echo ""
 
@@ -22,15 +22,15 @@ fi
 
 echo ""
 echo "Testing /me..."
-curl -s https://rslvd.net/api/auth/me -H "Authorization: Bearer $TOKEN" | python3 -m json.tool 2>/dev/null | head -20
+curl -s https://rslvd.privatedns.org/api/auth/me -H "Authorization: Bearer $TOKEN" | python3 -m json.tool 2>/dev/null | head -20
 
 echo ""
 echo "Testing /admin/stats..."
-curl -s https://rslvd.net/api/admin/stats -H "Authorization: Bearer $TOKEN" | python3 -m json.tool 2>/dev/null
+curl -s https://rslvd.privatedns.org/api/admin/stats -H "Authorization: Bearer $TOKEN" | python3 -m json.tool 2>/dev/null
 
 echo ""
 echo "Testing /tunnels (list)..."
-curl -s https://rslvd.net/api/tunnels -H "Authorization: Bearer $TOKEN"
+curl -s https://rslvd.privatedns.org/api/tunnels -H "Authorization: Bearer $TOKEN"
 
 echo ""
 echo "=== All tests passed ==="

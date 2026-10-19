@@ -4,14 +4,14 @@ set -e
 echo "=== TCP Tunnel End-to-End Test ==="
 
 # Get auth token
-TOKEN=$(curl -sf -X POST https://rslvd.net/api/auth/login \
+TOKEN=$(curl -sf -X POST https://rslvd.privatedns.org/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"garet@email.com","password":"impfa6bAQm!xRhfQrilR"}' \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
 echo "Auth OK"
 
 # Create a tunnel
-TUNNEL=$(curl -sf -X POST https://rslvd.net/api/tunnels \
+TUNNEL=$(curl -sf -X POST https://rslvd.privatedns.org/api/tunnels \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"tcptest","target_port":9999}')
@@ -58,5 +58,5 @@ kill $SOCAT_PID 2>/dev/null || true
 
 # Cleanup tunnel in DB
 TID=$(echo "$TUNNEL" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
-curl -sf -X DELETE "https://rslvd.net/api/tunnels/$TID" -H "Authorization: Bearer $TOKEN" > /dev/null
+curl -sf -X DELETE "https://rslvd.privatedns.org/api/tunnels/$TID" -H "Authorization: Bearer $TOKEN" > /dev/null
 echo "Tunnel cleaned up."

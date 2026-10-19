@@ -1,5 +1,5 @@
 [Unit]
-Description=rslvd.net Dynamic DNS Service
+Description=rslvd.privatedns.org Dynamic DNS Service
 After=network.target postgresql.service redis-server.service
 
 [Service]

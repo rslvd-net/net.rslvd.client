@@ -1,11 +1,11 @@
 #!/bin/sh
 # rslvd-tunnel installer for OpenWRT
 # Run from the router shell:
-#   curl -fsSL https://rslvd.net/install-openwrt.sh | sh
+#   curl -fsSL https://rslvd.privatedns.org/install-openwrt.sh | sh
 # or if curl isn't available:
-#   wget -qO- https://rslvd.net/install-openwrt.sh | sh
+#   wget -qO- https://rslvd.privatedns.org/install-openwrt.sh | sh
 
-BASE_URL="https://rslvd.net/dl"
+BASE_URL="https://rslvd.privatedns.org/dl"
 INSTALL_DIR="/usr/local/bin"
 BINARY="$INSTALL_DIR/rslvd-tunnel"
 
@@ -88,5 +88,5 @@ echo ""
 echo "  Example (expose a local web server on port 80):"
 echo "    rslvd-tunnel abc123... 80"
 echo ""
-echo "  Get your token from: https://rslvd.net/dashboard"
+echo "  Get your token from: https://rslvd.privatedns.org/dashboard"
 echo ""

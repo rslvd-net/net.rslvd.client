@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DuckDNS Alternative with Tunnels &amp; HTTPS — rslvd.net</title>
-  <meta name="description" content="rslvd.net is a free DuckDNS alternative: dynamic DNS plus reverse tunnels that work behind CGNAT, automatic HTTPS certificates, router integration, and a native Android updater." />
-  <link rel="canonical" href="https://rslvd.net/duckdns-alternative" />
+  <title>DuckDNS Alternative with Tunnels &amp; HTTPS — rslvd.privatedns.org</title>
+  <meta name="description" content="rslvd.privatedns.org is a free DuckDNS alternative: dynamic DNS plus reverse tunnels that work behind CGNAT, automatic HTTPS certificates, router integration, and a native Android updater." />
+  <link rel="canonical" href="https://rslvd.privatedns.org/duckdns-alternative" />
   <meta property="og:type" content="article" />
-  <meta property="og:url" content="https://rslvd.net/duckdns-alternative" />
-  <meta property="og:title" content="DuckDNS Alternative with Tunnels & HTTPS — rslvd.net" />
+  <meta property="og:url" content="https://rslvd.privatedns.org/duckdns-alternative" />
+  <meta property="og:title" content="DuckDNS Alternative with Tunnels & HTTPS — rslvd.privatedns.org" />
   <meta property="og:description" content="Dynamic DNS plus reverse tunnels behind CGNAT, automatic HTTPS, router integration, Android app." />
-  <meta property="og:image" content="https://rslvd.net/icons/icon-512.png" />
+  <meta property="og:image" content="https://rslvd.privatedns.org/icons/icon-512.png" />
   <link rel="icon" href="/icons/icon-192.png" />
   <link rel="stylesheet" href="/landing.css" />
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
-    {"@type":"Question","name":"Is rslvd.net compatible with DuckDNS-style update URLs?","acceptedAnswer":{"@type":"Answer","text":"Yes. rslvd.net supports the standard DynDNS update protocol, so routers, DD-WRT, OpenWrt, and tools like ddclient work out of the box."}},
-    {"@type":"Question","name":"What if my ISP uses CGNAT and DDNS alone doesn't help?","acceptedAnswer":{"@type":"Answer","text":"Unlike plain DDNS services, rslvd.net includes reverse tunnels. The tunnel client dials out from your network, so your services are reachable even without a public IP."}},
-    {"@type":"Question","name":"Does rslvd.net provide HTTPS certificates?","acceptedAnswer":{"@type":"Answer","text":"Yes, Let's Encrypt certificates are issued and renewed automatically for your subdomains and tunnels."}}
+    {"@type":"Question","name":"Is rslvd.privatedns.org compatible with DuckDNS-style update URLs?","acceptedAnswer":{"@type":"Answer","text":"Yes. rslvd.privatedns.org supports the standard DynDNS update protocol, so routers, DD-WRT, OpenWrt, and tools like ddclient work out of the box."}},
+    {"@type":"Question","name":"What if my ISP uses CGNAT and DDNS alone doesn't help?","acceptedAnswer":{"@type":"Answer","text":"Unlike plain DDNS services, rslvd.privatedns.org includes reverse tunnels. The tunnel client dials out from your network, so your services are reachable even without a public IP."}},
+    {"@type":"Question","name":"Does rslvd.privatedns.org provide HTTPS certificates?","acceptedAnswer":{"@type":"Answer","text":"Yes, Let's Encrypt certificates are issued and renewed automatically for your subdomains and tunnels."}}
   ]}
   </script>
 </head>
@@ -25,12 +25,12 @@
   <nav><a href="/" class="logo">rslvd<span>.net</span></a><div><a href="/pricing">Pricing</a><a href="/tutorials">Tutorials</a><a href="/register" class="cta">Sign up free</a></div></nav>
   <main>
     <h1>A DuckDNS alternative that also works behind CGNAT</h1>
-    <p class="lead">DuckDNS does one thing: point a subdomain at your IP. That stops working the moment your ISP puts you behind CGNAT. <strong>rslvd.net</strong> is free dynamic DNS <em>plus</em> reverse tunnels, automatic HTTPS, and apps — so your services stay reachable either way.</p>
+    <p class="lead">DuckDNS does one thing: point a subdomain at your IP. That stops working the moment your ISP puts you behind CGNAT. <strong>rslvd.privatedns.org</strong> is free dynamic DNS <em>plus</em> reverse tunnels, automatic HTTPS, and apps — so your services stay reachable either way.</p>
 
-    <h2>rslvd.net vs DuckDNS</h2>
+    <h2>rslvd.privatedns.org vs DuckDNS</h2>
     <table>
-      <tr><th></th><th>rslvd.net free</th><th>DuckDNS</th></tr>
-      <tr><td>Free subdomains</td><td>2 (yourname.rslvd.net)</td><td>5</td></tr>
+      <tr><th></th><th>rslvd.privatedns.org free</th><th>DuckDNS</th></tr>
+      <tr><td>Free subdomains</td><td>2 (yourname.rslvd.privatedns.org)</td><td>5</td></tr>
       <tr><td>Works behind CGNAT</td><td>Yes — built-in reverse tunnels</td><td>No — needs public IP + port forwarding</td></tr>
       <tr><td>Automatic HTTPS certificates</td><td>Yes (Let's Encrypt, managed for you)</td><td>DIY (DNS-01 challenges)</td></tr>
       <tr><td>Standard DynDNS update protocol</td><td>Yes (routers, ddclient, DD-WRT, OpenWrt)</td><td>Own API</td></tr>
@@ -40,12 +40,12 @@
     </table>
 
     <h2>Keep your existing setup</h2>
-    <p>rslvd.net speaks the standard DynDNS v2 update protocol used by routers and <code>ddclient</code>:</p>
-    <pre><code>https://rslvd.net/api/update?key=YOUR_KEY&amp;ip=AUTO</code></pre>
+    <p>rslvd.privatedns.org speaks the standard DynDNS v2 update protocol used by routers and <code>ddclient</code>:</p>
+    <pre><code>https://rslvd.privatedns.org/api/update?key=YOUR_KEY&amp;ip=AUTO</code></pre>
     <p>Ready-made setup scripts exist for <a href="/tutorials">Linux, Windows, DD-WRT and OpenWrt</a>, plus a native <a href="/downloads">Android app</a> that updates your IP in the background.</p>
 
     <h2>And when DDNS isn't enough…</h2>
-    <p>If your ISP uses <a href="/ddns-for-cgnat">CGNAT</a> (common on LTE, 5G, Starlink, and many fiber ISPs), no DDNS service can make your IP reachable — you don't have one. rslvd.net's tunnel client dials out from your network and exposes your service at your subdomain anyway. Same account, same dashboard.</p>
+    <p>If your ISP uses <a href="/ddns-for-cgnat">CGNAT</a> (common on LTE, 5G, Starlink, and many fiber ISPs), no DDNS service can make your IP reachable — you don't have one. rslvd.privatedns.org's tunnel client dials out from your network and exposes your service at your subdomain anyway. Same account, same dashboard.</p>
 
     <p class="cta-row"><a class="button" href="/register">Get your free subdomain →</a></p>
   </main>

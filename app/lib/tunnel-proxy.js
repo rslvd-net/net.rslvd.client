@@ -516,7 +516,7 @@ udpDataSocket.on('error', (err) => log(`UDP Data error: ${err.message}`));
 // Useful when the client is behind a firewall that only allows DNS traffic.
 //
 // Protocol:
-//   Client → Server: DNS query with QNAME = <base32data>.<token>.tunnel.rslvd.net
+//   Client → Server: DNS query with QNAME = <base32data>.<token>.tunnel.rslvd.privatedns.org
 //   Server → Client: Raw response prefixed with type byte:
 //     0x00 = NOOP (no pending data)
 //     0x01 = DATA follows (rest of packet is TCP data from public connection)

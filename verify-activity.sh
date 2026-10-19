@@ -1,17 +1,17 @@
 #!/bin/bash
 echo "--- install.sh (first 3 lines) ---"
-curl -sf https://rslvd.net/install.sh | head -3
+curl -sf https://rslvd.privatedns.org/install.sh | head -3
 
 echo ""
 echo "--- rslvd-tunnel (first 2 lines) ---"
-curl -sf https://rslvd.net/rslvd-tunnel | head -2
+curl -sf https://rslvd.privatedns.org/rslvd-tunnel | head -2
 
 echo ""
 echo "--- Activity log endpoint ---"
-TOKEN=$(echo '{"email":"garet@email.com","password":"impfa6bAQm!xRhfQrilR"}' | curl -sf -X POST https://rslvd.net/api/auth/login -H 'Content-Type: application/json' -d @- | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
+TOKEN=$(echo '{"email":"garet@email.com","password":"impfa6bAQm!xRhfQrilR"}' | curl -sf -X POST https://rslvd.privatedns.org/api/auth/login -H 'Content-Type: application/json' -d @- | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
 echo "Token: ${TOKEN:0:20}..."
 
-ROWS=$(curl -sf "https://rslvd.net/api/admin/activity" -H "Authorization: Bearer $TOKEN")
+ROWS=$(curl -sf "https://rslvd.privatedns.org/api/admin/activity" -H "Authorization: Bearer $TOKEN")
 COUNT=$(echo "$ROWS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
 echo "$COUNT activity rows"
 echo "$ROWS" | python3 -c "
@@ -24,4 +24,4 @@ for r in rows[:5]:
 echo ""
 echo "--- Token lookup endpoint (public) ---"
 # Create a test tunnel first and check lookup
-curl -sf "https://rslvd.net/api/tunnels/connect/badtoken123" && echo "" || echo "404 as expected for bad token"
+curl -sf "https://rslvd.privatedns.org/api/tunnels/connect/badtoken123" && echo "" || echo "404 as expected for bad token"

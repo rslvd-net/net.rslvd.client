@@ -12,7 +12,7 @@ I'd love to hear:
 - What is your biggest remote-access challenge?
 - What would make a tool like this genuinely useful to you?
 
-Check it out: https://rslvd.net/
+Check it out: https://rslvd.privatedns.org/
 
 # RSLVD.NET
 
@@ -22,7 +22,7 @@ Check it out: https://rslvd.net/
 
 > Dynamic DNS & CGNAT Tunnel SaaS - Free subdomains, automatic IP updates, and TCP tunnels that punch through carrier-grade NAT.
 
-**Live:** https://rslvd.net
+**Live:** https://rslvd.privatedns.org
 
 ---
 
@@ -134,8 +134,8 @@ sudo apt install -y certbot python3-certbot-nginx
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/igaret/rslvd.net.git
-cd rslvd.net
+git clone https://github.com/igaret/rslvd.privatedns.org.git
+cd rslvd.privatedns.org
 
 # 2. Copy and configure environment
 cp app/.env.example app/.env
@@ -578,8 +578,8 @@ MIT License - See [LICENSE](LICENSE) file
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/igaret/rslvd.net/issues)
-- **Email:** garet@rslvd.net
+- **Issues:** [GitHub Issues](https://github.com/igaret/rslvd.privatedns.org/issues)
+- **Email:** garet@rslvd.privatedns.org
 - **Documentation:** This README and inline code comments
 
 ---
@@ -641,8 +641,8 @@ sudo apt install -y certbot python3-certbot-nginx
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/rslvd.net.git
-cd rslvd.net
+git clone https://github.com/yourusername/rslvd.privatedns.org.git
+cd rslvd.privatedns.org
 
 # 2. Copy and configure environment
 cp app/.env.example app/.env
@@ -705,8 +705,8 @@ sudo -u rslvd node -e "require('./db/migrate').run()"
 
 ```bash
 # Copy nginx config
-sudo cp app/nginx.conf /etc/nginx/sites-available/rslvd.net
-sudo ln -sf /etc/nginx/sites-available/rslvd.net /etc/nginx/sites-enabled/
+sudo cp app/nginx.conf /etc/nginx/sites-available/rslvd.privatedns.org
+sudo ln -sf /etc/nginx/sites-available/rslvd.privatedns.org /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # Test and reload
@@ -718,8 +718,8 @@ sudo systemctl reload nginx
 
 ```bash
 # Obtain certificate
-sudo certbot --nginx -d rslvd.net -d www.rslvd.net \
-  --email admin@rslvd.net --agree-tos --non-interactive
+sudo certbot --nginx -d rslvd.privatedns.org -d www.rslvd.privatedns.org \
+  --email admin@rslvd.privatedns.org --agree-tos --non-interactive
 
 # Auto-renewal is set up automatically
 ```
@@ -769,8 +769,8 @@ SQUARE_ENVIRONMENT=production
 SQUARE_WEBHOOK_SIGNATURE_KEY=...
 
 # Domain
-BASE_DOMAIN=rslvd.net
-APP_URL=https://rslvd.net
+BASE_DOMAIN=rslvd.privatedns.org
+APP_URL=https://rslvd.privatedns.org
 SERVER_IP=your_server_ip
 ```
 
@@ -903,7 +903,7 @@ GET /api/hosts
 
 # Create host
 POST /api/hosts
-{ "fqdn": "myhost.rslvd.net" }
+{ "fqdn": "myhost.rslvd.privatedns.org" }
 
 # Update IP (DynDNS compatible)
 GET /api/update?key=<update_key>&ip=1.2.3.4
@@ -1027,7 +1027,7 @@ sudo nginx -t
 sudo netstat -tlnp | grep -E '7000|7001'
 
 # Test DNS resolution
-nslookup rslvd.net 8.8.8.8
+nslookup rslvd.privatedns.org 8.8.8.8
 ```
 
 **IONOS DNS errors:**
@@ -1043,7 +1043,7 @@ nslookup rslvd.net 8.8.8.8
 sudo journalctl -u rslvd -n 100 --no-pager
 
 # Nginx logs
-sudo tail -f /var/log/nginx/rslvd.net-error.log
+sudo tail -f /var/log/nginx/rslvd.privatedns.org-error.log
 
 # Tunnel proxy logs (in app logs)
 sudo journalctl -u rslvd | grep "TUNNEL"
@@ -1097,11 +1097,11 @@ MIT License - See [LICENSE](LICENSE) file
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/rslvd.net/issues)
-- **Email:** admin@rslvd.net support@rslvd.net *@rslvd.net
+- **Issues:** [GitHub Issues](https://github.com/yourusername/rslvd.privatedns.org/issues)
+- **Email:** admin@rslvd.privatedns.org support@rslvd.privatedns.org *@rslvd.privatedns.org
 
 - **Documentation:** This README and inline code comments
 
 ---
 
-**Built with ❤️ by the rslvd.net team** 
+**Built with ❤️ by the rslvd.privatedns.org team** 

@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dynamic DNS Behind CGNAT — How to Reach Your Home Network — rslvd.net</title>
-  <meta name="description" content="Stuck behind CGNAT with no public IP? Learn why normal DDNS and port forwarding fail, and how rslvd.net's free reverse tunnels make your home network reachable anyway." />
-  <link rel="canonical" href="https://rslvd.net/ddns-for-cgnat" />
+  <title>Dynamic DNS Behind CGNAT — How to Reach Your Home Network — rslvd.privatedns.org</title>
+  <meta name="description" content="Stuck behind CGNAT with no public IP? Learn why normal DDNS and port forwarding fail, and how rslvd.privatedns.org's free reverse tunnels make your home network reachable anyway." />
+  <link rel="canonical" href="https://rslvd.privatedns.org/ddns-for-cgnat" />
   <meta property="og:type" content="article" />
-  <meta property="og:url" content="https://rslvd.net/ddns-for-cgnat" />
+  <meta property="og:url" content="https://rslvd.privatedns.org/ddns-for-cgnat" />
   <meta property="og:title" content="Dynamic DNS Behind CGNAT — How to Reach Your Home Network" />
   <meta property="og:description" content="Why DDNS and port forwarding fail behind CGNAT, and how reverse tunnels fix it — free." />
-  <meta property="og:image" content="https://rslvd.net/icons/icon-512.png" />
+  <meta property="og:image" content="https://rslvd.privatedns.org/icons/icon-512.png" />
   <link rel="icon" href="/icons/icon-192.png" />
   <link rel="stylesheet" href="/landing.css" />
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
     {"@type":"Question","name":"How do I know if I'm behind CGNAT?","acceptedAnswer":{"@type":"Answer","text":"Compare your router's WAN IP with the IP shown by a 'what is my IP' site. If they differ — or the WAN IP starts with 100.64–100.127 — you're behind CGNAT."}},
     {"@type":"Question","name":"Can port forwarding work behind CGNAT?","acceptedAnswer":{"@type":"Answer","text":"No. Port forwarding only configures your own router, but behind CGNAT the ISP's equipment drops inbound connections before they ever reach you."}},
-    {"@type":"Question","name":"How does a reverse tunnel bypass CGNAT?","acceptedAnswer":{"@type":"Answer","text":"The tunnel client on your network makes an outbound connection to rslvd.net, which CGNAT allows. Visitors connect to your rslvd.net subdomain, and traffic flows back through that established connection."}}
+    {"@type":"Question","name":"How does a reverse tunnel bypass CGNAT?","acceptedAnswer":{"@type":"Answer","text":"The tunnel client on your network makes an outbound connection to rslvd.privatedns.org, which CGNAT allows. Visitors connect to your rslvd.privatedns.org subdomain, and traffic flows back through that established connection."}}
   ]}
   </script>
 </head>
@@ -38,12 +38,12 @@
     <p>Dynamic DNS points a hostname at your public IP. Behind CGNAT that IP is shared by hundreds of customers, and the ISP's NAT drops all unsolicited inbound traffic. There is nothing to forward a port <em>to</em> — the connection dies at the carrier.</p>
 
     <h2>The fix: reverse tunnels</h2>
-    <p>A reverse tunnel flips the direction. A small client on your network makes an <strong>outbound</strong> connection to rslvd.net (outbound always works, even behind CGNAT). When someone visits <code>yourname.rslvd.net</code>, the traffic rides back through that established connection to your local service.</p>
+    <p>A reverse tunnel flips the direction. A small client on your network makes an <strong>outbound</strong> connection to rslvd.privatedns.org (outbound always works, even behind CGNAT). When someone visits <code>yourname.rslvd.privatedns.org</code>, the traffic rides back through that established connection to your local service.</p>
     <ol>
       <li><a href="/register">Create a free account</a> — the free plan includes 2 tunnels and 2 DDNS hosts</li>
       <li>Add a tunnel in the dashboard and copy its token</li>
       <li>Run the <a href="/downloads">rslvd tunnel client</a> on any machine inside your network</li>
-      <li>Your service is live at <code>https://yourname.rslvd.net</code> with automatic HTTPS</li>
+      <li>Your service is live at <code>https://yourname.rslvd.privatedns.org</code> with automatic HTTPS</li>
     </ol>
     <p>TCP, UDP, and even DNS-based tunneling (for networks that block everything else) are supported. Step-by-step guides: <a href="/tutorials">Linux &amp; Windows tutorials</a>.</p>
 

@@ -15,9 +15,9 @@ RequestExecutionLevel admin
 VIProductVersion "1.2.0.0"
 VIAddVersionKey "ProductName" "rslvd-tunnel"
 VIAddVersionKey "ProductVersion" "1.2.0"
-VIAddVersionKey "CompanyName" "rslvd.net"
-VIAddVersionKey "FileDescription" "rslvd.net Tunnel Client Installer"
-VIAddVersionKey "LegalCopyright" "2026 rslvd.net"
+VIAddVersionKey "CompanyName" "rslvd.privatedns.org"
+VIAddVersionKey "FileDescription" "rslvd.privatedns.org Tunnel Client Installer"
+VIAddVersionKey "LegalCopyright" "2026 rslvd.privatedns.org"
 
 ; ─── MUI Settings ────────────────────────────────────────────────────────────
 !define MUI_ABORTWARNING
@@ -54,9 +54,9 @@ Section "Install"
   WriteRegStr HKLM "Software\rslvd-tunnel" "InstallDir" "$INSTDIR"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "DisplayName" "rslvd-tunnel"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "DisplayVersion" "1.2.0"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "Publisher" "rslvd.net"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "Publisher" "rslvd.privatedns.org"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "UninstallString" "$INSTDIR\uninstall.exe"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "URLInfoAbout" "https://rslvd.net"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "URLInfoAbout" "https://rslvd.privatedns.org"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\rslvd-tunnel" "NoRepair" 1
   

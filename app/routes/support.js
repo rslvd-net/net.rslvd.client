@@ -55,9 +55,9 @@ router.post('/', requireAuth, async (req, res) => {
     if (notifyTo) {
       sendMail({
         to: notifyTo,
-        subject: `[rslvd.net] New support ticket #${ticket.id}: ${subject.trim()}`,
-        text: `New support ticket from ${req.user.email}\n\nSubject: ${subject.trim()}\n\n${body.trim()}\n\nView: https://rslvd.net/admin`,
-        html: `<p><strong>New support ticket from ${req.user.email}</strong></p><p><strong>Subject:</strong> ${subject.trim()}</p><hr><p style="white-space:pre-wrap">${body.trim()}</p><p><a href="https://rslvd.net/admin">View in admin panel →</a></p>`,
+        subject: `[rslvd.privatedns.org] New support ticket #${ticket.id}: ${subject.trim()}`,
+        text: `New support ticket from ${req.user.email}\n\nSubject: ${subject.trim()}\n\n${body.trim()}\n\nView: https://rslvd.privatedns.org/admin`,
+        html: `<p><strong>New support ticket from ${req.user.email}</strong></p><p><strong>Subject:</strong> ${subject.trim()}</p><hr><p style="white-space:pre-wrap">${body.trim()}</p><p><a href="https://rslvd.privatedns.org/admin">View in admin panel →</a></p>`,
       }).catch(e => console.error('[support] notify email failed:', e.message));
     }
 
@@ -117,7 +117,7 @@ router.post('/:id/reply', requireAuth, async (req, res) => {
     } else if (!isStaff(u) && ticket.status === 'escalated') {
       notifyAdmin(
         `Support ticket #${ticket.id}: new reply`,
-        `${u.email} replied on an escalated ticket.\n\n${body.trim().slice(0, 500)}\n\nhttps://rslvd.net/support`
+        `${u.email} replied on an escalated ticket.\n\n${body.trim().slice(0, 500)}\n\nhttps://rslvd.privatedns.org/support`
       ).catch(e => console.error('[support] notify failed:', e.message));
     }
     res.status(201).json(msg);

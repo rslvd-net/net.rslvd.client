@@ -1,4 +1,4 @@
-// rslvd.net — full app v2
+// rslvd.privatedns.org — full app v2
 const { useState, useEffect, useCallback, useRef } = React;
 
 // ── API ─────────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ function Landing({ navigate }) {
         'Dynamic DNS\n',
         React.createElement('span', { style: { color: 'var(--accent2)' } }, 'that just works')
       ),
-      React.createElement('p', null, 'Keep your subdomains on rslvd.net always pointing to your home or office IP. DynDNS-compatible, updates in seconds.'),
+      React.createElement('p', null, 'Keep your subdomains on rslvd.privatedns.org always pointing to your home or office IP. DynDNS-compatible, updates in seconds.'),
       React.createElement('div', { style: { display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' } },
         React.createElement('button', { className: 'btn btn-primary btn-lg', onClick: () => navigate('/register') }, 'Start for $0.99 →'),
         React.createElement('button', { className: 'btn btn-secondary btn-lg', onClick: () => document.getElementById('pricing').scrollIntoView({ behavior: 'smooth' }) }, 'View plans')
@@ -162,7 +162,7 @@ function Landing({ navigate }) {
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20, textAlign: 'left' } },
         ...[
           { n: '01', title: 'Create account', desc: 'Sign up, pick a plan and get access to your dashboard.' },
-          { n: '02', title: 'Add a hostname', desc: 'Choose a subdomain like home.rslvd.net. Get your unique update key.' },
+          { n: '02', title: 'Add a hostname', desc: 'Choose a subdomain like home.rslvd.privatedns.org. Get your unique update key.' },
           { n: '03', title: 'Configure your router', desc: 'Point your router\'s DDNS to our URL. Done.' },
         ].map(s => React.createElement('div', { key: s.n, className: 'card' },
           React.createElement('div', { style: { fontSize: 12, color: 'var(--accent2)', fontWeight: 700, marginBottom: 8 } }, s.n),
@@ -199,7 +199,7 @@ function Landing({ navigate }) {
       React.createElement('h2', { style: { fontSize: 22, marginBottom: 20, textAlign: 'center' } }, 'Update URL format'),
       React.createElement('div', { className: 'card' },
         React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 12 } }, 'Use this URL in your router or DDNS client:'),
-        React.createElement(CopyBox, { text: 'https://rslvd.net/api/update?key=YOUR_UPDATE_KEY&ip=auto' }),
+        React.createElement(CopyBox, { text: 'https://rslvd.privatedns.org/api/update?key=YOUR_UPDATE_KEY&ip=auto' }),
         React.createElement('div', { style: { marginTop: 16, display: 'grid', gap: 8 } },
           ...[
             { param: 'key', desc: 'Your host\'s unique update key (from dashboard)' },
@@ -215,7 +215,7 @@ function Landing({ navigate }) {
 
     // Footer
     React.createElement('footer', { style: { borderTop: '1px solid var(--border)', padding: '32px 24px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 } },
-      React.createElement('div', null, '© 2026 rslvd.net — Dynamic DNS Service'),
+      React.createElement('div', null, '© 2026 rslvd.privatedns.org — Dynamic DNS Service'),
       React.createElement('div', { style: { marginTop: 8, display: 'flex', gap: 20, justifyContent: 'center' } },
         React.createElement('a', { href: '#pricing' }, 'Pricing'),
         React.createElement('span', { style: { cursor: 'pointer', color: 'var(--accent2)' }, onClick: () => window.navigate && window.navigate('/login') }, 'Sign in')
@@ -351,7 +351,7 @@ function AddHostModal({ onClose, onCreated }) {
             }),
             React.createElement('span', {
               style: { padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '0 8px 8px 0', color: 'var(--text2)', fontSize: 14, whiteSpace: 'nowrap' }
-            }, '.rslvd.net')
+            }, '.rslvd.privatedns.org')
           ),
           React.createElement('p', { className: 'form-hint' }, 'Lowercase letters, numbers and hyphens only')
         ),
@@ -372,7 +372,7 @@ function HostRow({ host, onDelete, onRegenKey }) {
   const [deleting, setDeleting] = useState(false);
   const [regen, setRegen] = useState(false);
 
-  const updateUrl = `https://rslvd.net/api/update?key=${host.update_key}&ip=auto`;
+  const updateUrl = `https://rslvd.privatedns.org/api/update?key=${host.update_key}&ip=auto`;
 
   const handleDelete = async () => {
     if (!confirm(`Delete ${host.fqdn}? This will remove the DNS record.`)) return;

@@ -22,7 +22,7 @@ async function sendMail({ to, subject, text, html }) {
     return;
   }
   return transporter.sendMail({
-    from: process.env.SMTP_FROM || `"rslvd.net" <${user || 'noreply@rslvd.net'}>`,
+    from: process.env.SMTP_FROM || `"rslvd.privatedns.org" <${user || 'noreply@rslvd.privatedns.org'}>`,
     to,
     subject,
     text,

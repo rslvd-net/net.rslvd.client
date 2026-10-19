@@ -30,11 +30,11 @@ Section: net
 Priority: optional
 Architecture: ${DEB_ARCH}
 Installed-Size: ${SIZE}
-Maintainer: rslvd.net <support@rslvd.net>
-Homepage: https://rslvd.net
-Description: Dynamic DNS + CGNAT tunnel client for rslvd.net
+Maintainer: rslvd.privatedns.org <support@rslvd.privatedns.org>
+Homepage: https://rslvd.privatedns.org
+Description: Dynamic DNS + CGNAT tunnel client for rslvd.privatedns.org
  A lightweight tunnel client that connects your local services to the
- internet through rslvd.net. Supports TCP, UDP, and DNS2TCP tunneling
+ internet through rslvd.privatedns.org. Supports TCP, UDP, and DNS2TCP tunneling
  modes. Works behind carrier-grade NAT (CGNAT) without port forwarding.
 EOF
 
@@ -42,7 +42,7 @@ EOF
   mkdir -p "$PKG_DIR/etc/rslvd-tunnel"
   cat > "$PKG_DIR/etc/systemd/system/rslvd-tunnel@.service" << EOF
 [Unit]
-Description=rslvd.net Tunnel (%i)
+Description=rslvd.privatedns.org Tunnel (%i)
 After=network-online.target
 Wants=network-online.target
 

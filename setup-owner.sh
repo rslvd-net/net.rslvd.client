@@ -6,7 +6,7 @@ OWNER_PASS=$(python3 -c "import secrets,string; print(''.join(secrets.choice(str
 
 # Store it to /opt/rslvd/owner-credentials.txt
 sudo tee /opt/rslvd/owner-credentials.txt > /dev/null << EOF
-# rslvd.net Site Owner Credentials
+# rslvd.privatedns.org Site Owner Credentials
 # Generated: $(date)
 email: garet@email.com
 password: $OWNER_PASS

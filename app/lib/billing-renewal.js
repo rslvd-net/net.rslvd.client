@@ -23,7 +23,7 @@ async function renewUser(user) {
       userId: user.id, plan: user.plan, kind: 'renewal', amountCents: planInfo.amountCents,
       customerId: user.square_customer_id, cardId: user.square_card_id,
     });
-    const payment = await payments.executeIntent(intent, `rslvd.net ${planInfo.label} plan renewal`);
+    const payment = await payments.executeIntent(intent, `rslvd.privatedns.org ${planInfo.label} plan renewal`);
     const expires = await payments.applyIntent(intent, payment);
     console.log(`Billing: renewed ${user.email} (${user.plan}) through ${expires.toISOString()}`);
   } catch (err) {

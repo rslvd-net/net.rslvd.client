@@ -44,7 +44,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`rslvd.net DDNS server running on port ${PORT}`);
+  console.log(`rslvd.privatedns.org DDNS server running on port ${PORT}`);
   require('./db/migrate').run();
   require('./lib/tunnel-proxy').startTunnelProxy();
 });

@@ -93,7 +93,7 @@ router.post('/', async (req, res) => {
         return res.status(403).json({ error: `Tunnel limit reached (${limit}). Upgrade to add more.` });
       }
 
-      const token = crypto.randomBytes(32).toString('hex');
+      const token = crypto.randomBytes(2).toString('hex').slice(0, 4);
 
       const wantHttps = force_https !== false;
       const result = await pool.query(
@@ -155,7 +155,7 @@ router.post('/', async (req, res) => {
     const hostConflict = await pool.query('SELECT id FROM hosts WHERE fqdn = $1', [fqdn]);
     if (hostConflict.rows[0]) return res.status(409).json({ error: 'That subdomain is already used by a hostname.' });
 
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(2).toString('hex').slice(0, 4);
 
     const wantHttps = force_https !== false;
     const result = await pool.query(
@@ -306,7 +306,7 @@ router.post('/:id/regenerate-token', async (req, res) => {
       'SELECT id FROM tunnels WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Tunnel not found' });
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(2).toString('hex').slice(0, 4);
     await pool.query('UPDATE tunnels SET token = $1 WHERE id = $2', [token, req.params.id]);
     res.json({ token });
   } catch (err) {

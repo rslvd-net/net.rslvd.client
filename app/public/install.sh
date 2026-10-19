@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # rslvd-tunnel installer — one line install:
-#   curl -fsSL https://rslvd.net/install.sh | bash
+#   curl -fsSL https://rslvd.privatedns.org/install.sh | bash
 #
 # Installs the native Go binary — no SSH, no dependencies needed.
 set -e
 
-BASE_URL="https://rslvd.net/dl"
+BASE_URL="https://rslvd.privatedns.org/dl"
 
 # Termux (Android) uses $PREFIX/bin which is always in PATH
 if [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
@@ -41,7 +41,7 @@ case "$OS" in
   linux|darwin) ;;
   *)
     echo "  ✗ Unsupported OS: $OS"
-    echo "  Windows users: download from https://rslvd.net/dl/rslvd-tunnel-windows-amd64.exe"
+    echo "  Windows users: download from https://rslvd.privatedns.org/dl/rslvd-tunnel-windows-amd64.exe"
     exit 1 ;;
 esac
 
@@ -89,5 +89,5 @@ echo ""
 echo "  Example (expose local port 8080):"
 echo "    rslvd-tunnel abc123... 8080"
 echo ""
-echo "  Get your token from: https://rslvd.net/dashboard"
+echo "  Get your token from: https://rslvd.privatedns.org/dashboard"
 echo ""

@@ -77,7 +77,7 @@ router.post('/subscribe', requireAuth, requireGateway, async (req, res) => {
       userId: user.id, plan, kind: 'subscribe', amountCents: planInfo.amountCents,
       customerId, cardId: card.id,
     });
-    const payment = await payments.executeIntent(intent, `rslvd.net ${planInfo.label} plan (${plan})`);
+    const payment = await payments.executeIntent(intent, `rslvd.privatedns.org ${planInfo.label} plan (${plan})`);
     const expires = await payments.applyIntent(intent, payment);
 
     res.json({ success: true, subscription: { id: payment.id, status: 'active', plan, paidThroughDate: expires } });
@@ -106,7 +106,7 @@ router.post('/donate', requireAuth, requireGateway, async (req, res) => {
       userId: user.id, plan: 'donation', kind: 'donation', amountCents: cents,
       customerId, cardId: card.id,
     });
-    const payment = await payments.executeIntent(intent, 'rslvd.net donation');
+    const payment = await payments.executeIntent(intent, 'rslvd.privatedns.org donation');
     const bonus = await payments.applyDonation(intent, payment);
 
     activity.log('user.donation', { userId: user.id, detail: `$${(cents / 100).toFixed(2)}`, req });

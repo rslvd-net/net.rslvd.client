@@ -29,7 +29,7 @@ async function sendNtfyPush(subject, message) {
   const topic = process.env.NTFY_TOPIC;
   if (!topic) return false;
   const server = process.env.NTFY_SERVER || 'https://ntfy.sh';
-  const headers = { Title: `rslvd.net: ${subject}`, Priority: 'high', Tags: 'bell' };
+  const headers = { Title: `rslvd.privatedns.org: ${subject}`, Priority: 'high', Tags: 'bell' };
   if (process.env.NTFY_TOKEN) headers.Authorization = `Bearer ${process.env.NTFY_TOKEN}`;
   const res = await fetch(`${server}/${topic}`, { method: 'POST', headers, body: message });
   if (!res.ok) throw new Error(`ntfy ${res.status}: ${await res.text()}`);
@@ -37,7 +37,7 @@ async function sendNtfyPush(subject, message) {
 }
 
 async function notifyAdmin(subject, message) {
-  const text = `[rslvd.net] ${subject}\n${message}`;
+  const text = `[rslvd.privatedns.org] ${subject}\n${message}`;
   try {
     if (await sendNtfyPush(subject, message)) return;
   } catch (err) {
@@ -55,7 +55,7 @@ async function notifyAdmin(subject, message) {
       return;
     }
     if (process.env.ADMIN_EMAIL) {
-      await sendMail({ to: process.env.ADMIN_EMAIL, subject: `[rslvd.net] ${subject}`, text: message });
+      await sendMail({ to: process.env.ADMIN_EMAIL, subject: `[rslvd.privatedns.org] ${subject}`, text: message });
       return;
     }
     console.warn('[notify] No admin notification route configured:', subject);

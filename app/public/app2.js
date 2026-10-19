@@ -125,7 +125,7 @@ function Landing({ navigate }) {
   ];
 
   const features = [
-    { icon: '🌐', title: 'Dynamic DNS', desc: 'Your subdomain on rslvd.net always follows your home or office IP. Updates propagate in under 60 seconds.' },
+    { icon: '🌐', title: 'Dynamic DNS', desc: 'Your subdomain on rslvd.privatedns.org always follows your home or office IP. Updates propagate in under 60 seconds.' },
     { icon: '🚇', title: 'CGNAT Tunnel', desc: 'Stuck behind carrier-grade NAT? Our TCP tunnel punches right through — no port forwarding, no ISP cooperation needed.' },
     { icon: '🔌', title: 'WebSocket Ready', desc: 'Full HTTP/WS proxy — WebSockets, Server-Sent Events, and binary protocols all work out of the box.' },
     { icon: '📡', title: 'Router Native', desc: 'One-command installer for OpenWRT and DD-WRT routers. MIPS, ARM, x86 — all covered.' },
@@ -138,14 +138,14 @@ function Landing({ navigate }) {
   const useCases = [
     { icon: '🏠', title: 'Home Lab', desc: 'Expose your Proxmox, Home Assistant, Plex, or self-hosted services to the internet without touching your ISP.' },
     { icon: '💻', title: 'Dev & Testing', desc: 'Share a localhost dev server with a client or teammate instantly. No VPN, no ngrok account, no bandwidth limits.' },
-    { icon: '📹', title: 'IP Cameras & NVRs', desc: 'Access your cameras remotely without a static IP. Point rslvd.net at your NVR and you\'re done.' },
+    { icon: '📹', title: 'IP Cameras & NVRs', desc: 'Access your cameras remotely without a static IP. Point rslvd.privatedns.org at your NVR and you\'re done.' },
     { icon: '🌍', title: 'Remote Access', desc: 'SSH, RDP, VNC — tunnel any protocol. Access your home PC or office server from anywhere.' },
   ];
 
   const faqs = [
     { q: 'What is CGNAT?', a: 'Carrier-Grade NAT is when your ISP shares a single public IP across many customers. Port forwarding doesn\'t work because you don\'t actually own the public IP. Our tunnel bypasses this entirely.' },
-    { q: 'How is this different from ngrok?', a: 'rslvd.net gives you a permanent subdomain (not a random URL), supports WebSockets, works on routers and Android, has no session time limits, and costs a fraction of the price.' },
-    { q: 'Does the tunnel support HTTPS?', a: 'Yes. All tunnels are served over HTTPS via *.rslvd.net — our wildcard SSL certificate covers every subdomain. Your traffic is encrypted end-to-end from browser to server.' },
+    { q: 'How is this different from ngrok?', a: 'rslvd.privatedns.org gives you a permanent subdomain (not a random URL), supports WebSockets, works on routers and Android, has no session time limits, and costs a fraction of the price.' },
+    { q: 'Does the tunnel support HTTPS?', a: 'Yes. All tunnels are served over HTTPS via *.rslvd.privatedns.org — our wildcard SSL certificate covers every subdomain. Your traffic is encrypted end-to-end from browser to server.' },
     { q: 'Can I run multiple tunnels?', a: 'Yes. Free tier gets 2 tunnels. Paid plans scale up to unlimited. Each tunnel gets its own subdomain and token.' },
     { q: 'Does it work on OpenWRT / DD-WRT?', a: 'Yes — dedicated one-line installers for both. Auto-detects your router\'s architecture (MIPS, ARM, x86) and persistent storage location.' },
   ];
@@ -191,7 +191,7 @@ function Landing({ navigate }) {
         React.createElement('span', { style: { color: 'var(--accent2)' } }, 'on the internet.')
       ),
       React.createElement('p', null,
-        'Dynamic DNS + CGNAT tunnel in one. Get a permanent ', React.createElement('strong', null, 'yourname.rslvd.net'), ' subdomain that always points to your machine — even behind carrier-grade NAT.'
+        'Dynamic DNS + CGNAT tunnel in one. Get a permanent ', React.createElement('strong', null, 'yourname.rslvd.privatedns.org'), ' subdomain that always points to your machine — even behind carrier-grade NAT.'
       ),
       React.createElement('div', { style: { display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 48 } },
         React.createElement('button', { className: 'btn btn-primary btn-lg', onClick: () => navigate('/register') }, 'Get started free →'),
@@ -200,7 +200,7 @@ function Landing({ navigate }) {
       // Quick install strip
       React.createElement('div', { style: { maxWidth: 560, margin: '0 auto', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', textAlign: 'left' } },
         React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)', marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' } }, 'Quick install'),
-        React.createElement(CopyBox, { text: 'curl -fsSL https://rslvd.net/install.sh | bash' })
+        React.createElement(CopyBox, { text: 'curl -fsSL https://rslvd.privatedns.org/install.sh | bash' })
       )
     ),
 
@@ -217,7 +217,7 @@ function Landing({ navigate }) {
     // ── Use cases ─────────────────────────────────────────────────────────────
     React.createElement('div', { style: { maxWidth: 1000, margin: '0 auto 80px', padding: '0 24px' } },
       React.createElement('h2', { style: { textAlign: 'center', fontSize: 28, marginBottom: 8 } }, 'Built for real-world use cases'),
-      React.createElement('p', { style: { textAlign: 'center', color: 'var(--text2)', marginBottom: 40 } }, 'Whether you\'re a tinkerer, developer, or IT admin — rslvd.net has you covered.'),
+      React.createElement('p', { style: { textAlign: 'center', color: 'var(--text2)', marginBottom: 40 } }, 'Whether you\'re a tinkerer, developer, or IT admin — rslvd.privatedns.org has you covered.'),
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 } },
         ...useCases.map(u => React.createElement('div', { key: u.title, className: 'card' },
           React.createElement('div', { style: { fontSize: 32, marginBottom: 12 } }, u.icon),
@@ -272,7 +272,7 @@ function Landing({ navigate }) {
       React.createElement('div', { className: 'card', style: { textAlign: 'center' } },
         React.createElement('h2', { style: { fontSize: 20, marginBottom: 6 } }, '🔗 Router DDNS — paste and go'),
         React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 20 } }, 'Add this URL to your router\'s DDNS settings. Your IP updates automatically, forever.'),
-        React.createElement(CopyBox, { text: 'https://rslvd.net/api/update?key=YOUR_UPDATE_KEY&ip=auto' }),
+        React.createElement(CopyBox, { text: 'https://rslvd.privatedns.org/api/update?key=YOUR_UPDATE_KEY&ip=auto' }),
         React.createElement('p', { style: { color: 'var(--text3)', fontSize: 12, marginTop: 10 } }, 'Replace YOUR_UPDATE_KEY with the key from your dashboard. Compatible with any DynDNS client.')
       )
     ),
@@ -331,7 +331,7 @@ function Landing({ navigate }) {
         React.createElement('a', { href: '/terms', onClick: e => { e.preventDefault(); navigate('/terms'); }, style: { color: 'var(--text3)', textDecoration: 'none' } }, 'Terms'),
         React.createElement('a', { href: '/privacy', onClick: e => { e.preventDefault(); navigate('/privacy'); }, style: { color: 'var(--text3)', textDecoration: 'none' } }, 'Privacy')
       ),
-      '© 2026 rslvd.net — Dynamic DNS & CGNAT tunnels'
+      '© 2026 rslvd.privatedns.org — Dynamic DNS & CGNAT tunnels'
     )
   );
 }
@@ -703,7 +703,7 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
 
   const canNest = user && (user.plan === 'annual' || user.role === 'site_owner' || user.role === 'admin');
   const topLevelTunnels = (existingTunnels || []).filter(t => !t.parent_tunnel_id);
-  const BASE = 'rslvd.net';
+  const BASE = 'rslvd.privatedns.org';
 
   const selectedParent = topLevelTunnels.find(t => t.id === parentId);
   const fqdnPreview = name
@@ -864,7 +864,7 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
     finally { setLockBusy(false); }
   };
 
-  const fqdn = t.fqdn || `${t.name}.rslvd.net`;
+  const fqdn = t.fqdn || `${t.name}.rslvd.privatedns.org`;
   const protocol = t.protocol || 'tcp';
   const useHttps = t.force_https !== false;
   const publicUrl = `${useHttps ? 'https' : 'http'}://${fqdn}`;
@@ -872,9 +872,9 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
   
   // Protocol-specific connection commands
   const protocolFlag = protocol === 'udp' ? '-udp ' : protocol === 'dns2tcp' ? '-dns ' : '';
-  const installCmd = `curl -fsSL https://rslvd.net/install.sh | bash`;
+  const installCmd = `curl -fsSL https://rslvd.privatedns.org/install.sh | bash`;
   const clientCmd = `rslvd-tunnel ${protocolFlag}${t.token} ${t.target_port}`;
-  const winDlUrl = `https://rslvd.net/dl/rslvd-tunnel-windows-amd64.exe`;
+  const winDlUrl = `https://rslvd.privatedns.org/dl/rslvd-tunnel-windows-amd64.exe`;
   const winCmd = `.\\rslvd-tunnel-windows-amd64.exe ${protocolFlag}${t.token} ${t.target_port}`;
   const dockerCmd = `docker run --rm --network host ghcr.io/rslvd/tunnel ${protocolFlag}${t.token} ${t.target_port}`;
 
@@ -995,11 +995,11 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
             React.createElement('div', { className: 'step-title' }, 'Install — SSH into your router and run the command for your firmware'),
             React.createElement('div', { style: { marginBottom: 8 } },
               React.createElement('div', { style: { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 4 } }, '1a. OpenWRT'),
-              React.createElement(CopyBox, { text: 'curl -fsSL https://rslvd.net/install-openwrt.sh | sh' })
+              React.createElement(CopyBox, { text: 'curl -fsSL https://rslvd.privatedns.org/install-openwrt.sh | sh' })
             ),
             React.createElement('div', null,
               React.createElement('div', { style: { fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 4 } }, '1b. DD-WRT'),
-              React.createElement(CopyBox, { text: 'curl -fsSL https://rslvd.net/install-ddwrt.sh | sh' })
+              React.createElement(CopyBox, { text: 'curl -fsSL https://rslvd.privatedns.org/install-ddwrt.sh | sh' })
             )
           )
         ),
@@ -1049,9 +1049,9 @@ function AddHostModal({ onClose, onCreated, user, existingHosts }) {
     if (!hostname) return '';
     if (mode === 'nested' && parentId) {
       const parent = topLevelHosts.find(h => h.id === parentId);
-      return parent ? `${hostname}.${parent.fqdn}` : `${hostname}.<parent>.rslvd.net`;
+      return parent ? `${hostname}.${parent.fqdn}` : `${hostname}.<parent>.rslvd.privatedns.org`;
     }
-    return `${hostname}.rslvd.net`;
+    return `${hostname}.rslvd.privatedns.org`;
   };
 
   const submit = async (e) => {
@@ -1070,7 +1070,7 @@ function AddHostModal({ onClose, onCreated, user, existingHosts }) {
 
     // Mode toggle (annual+ only)
     canNest && React.createElement('div', { style: { display: 'flex', gap: 0, marginBottom: 20, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', width: 'fit-content' } },
-      [['top', '🌐 Top-level'], ['nested', '🔗 Nested (sub.host.rslvd.net)']].map(([key, label]) =>
+      [['top', '🌐 Top-level'], ['nested', '🔗 Nested (sub.host.rslvd.privatedns.org)']].map(([key, label]) =>
         React.createElement('button', {
           key, type: 'button', onClick: () => { setMode(key); setHostname(''); },
           style: { padding: '8px 16px', background: mode === key ? 'var(--accent)' : 'var(--bg3)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: mode === key ? '#fff' : 'var(--text2)', fontFamily: 'Inter, sans-serif' }
@@ -1105,8 +1105,8 @@ function AddHostModal({ onClose, onCreated, user, existingHosts }) {
           }),
           React.createElement('span', { style: { padding: '10px 12px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '0 8px 8px 0', color: 'var(--text2)', fontSize: 13, whiteSpace: 'nowrap' } },
             mode === 'nested' && parentId
-              ? `.${(topLevelHosts.find(h => h.id === parentId) || {}).fqdn || 'parent.rslvd.net'}`
-              : '.rslvd.net'
+              ? `.${(topLevelHosts.find(h => h.id === parentId) || {}).fqdn || 'parent.rslvd.privatedns.org'}`
+              : '.rslvd.privatedns.org'
           )
         ),
         hostname && React.createElement('p', { className: 'form-hint', style: { color: 'var(--accent2)' } },
@@ -1143,7 +1143,7 @@ function HostCard({ host: h, onDelete, onRegenKey, onHttpsToggle, onIpUpdated, i
 
   const useHttps = h.force_https !== false;
   const manualIpString = manualIp.every(o => o && o >= 0 && o <= 255) ? manualIp.join('.') : null;
-  const updateUrl = `https://rslvd.net/api/update?key=${h.update_key}&ip=${manualIpString || detectedIp || h.ip_address || 'auto'}`;
+  const updateUrl = `https://rslvd.privatedns.org/api/update?key=${h.update_key}&ip=${manualIpString || detectedIp || h.ip_address || 'auto'}`;
 
   const handleHttpsToggle = async () => {
     const next = !useHttps;
@@ -1588,7 +1588,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         ? React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 48 } },
           React.createElement('div', { style: { fontSize: 40, marginBottom: 12 } }, '🌐'),
           React.createElement('h3', { style: { marginBottom: 8 } }, 'No hostnames yet'),
-          React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 16 } }, 'Create a free subdomain on rslvd.net'),
+          React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 16 } }, 'Create a free subdomain on rslvd.privatedns.org'),
           React.createElement('button', { className: 'btn btn-primary', onClick: () => setShowAddHost(true) }, '+ Add hostname')
         )
         : (() => {
@@ -1615,7 +1615,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         canAddTunnel && React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setShowAddTunnel(true) }, '+ New tunnel')
       ),
       React.createElement(Alert, { type: 'info' },
-        '🚇 Tunnels expose any local port to your own subdomain on rslvd.net — no SSH, no port-forwarding. Download the rslvd-tunnel binary and run one command. ',
+        '🚇 Tunnels expose any local port to your own subdomain on rslvd.privatedns.org — no SSH, no port-forwarding. Download the rslvd-tunnel binary and run one command. ',
         React.createElement('a', { href: '/tutorials/linux-tunnel', onClick: e => { e.preventDefault(); navigate('/tutorials/linux-tunnel'); }, style: { color: 'var(--accent2)', fontWeight: 600 } }, '🐧 Linux tutorial'),
         ' · ',
         React.createElement('a', { href: '/tutorials/windows-tunnel', onClick: e => { e.preventDefault(); navigate('/tutorials/windows-tunnel'); }, style: { color: 'var(--accent2)', fontWeight: 600 } }, '🪟 Windows tutorial')
@@ -2148,7 +2148,7 @@ function ReservedPanel() {
               required: true,
               style: { borderRadius: '8px 0 0 8px', borderRight: 'none' }
             }),
-            React.createElement('span', { style: { padding: '10px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '0 8px 8px 0', color: 'var(--text3)', fontSize: 12, whiteSpace: 'nowrap' } }, '.rslvd.net')
+            React.createElement('span', { style: { padding: '10px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '0 8px 8px 0', color: 'var(--text3)', fontSize: 12, whiteSpace: 'nowrap' } }, '.rslvd.privatedns.org')
           )
         ),
         React.createElement('div', { className: 'form-group', style: { margin: 0, flex: '2 1 200px' } },
@@ -2181,7 +2181,7 @@ function ReservedPanel() {
           filtered.map(r => React.createElement('tr', { key: r.id },
             React.createElement('td', null,
               React.createElement('code', { style: { fontSize: 13, color: 'var(--accent2)', fontWeight: 600 } }, r.subdomain),
-              React.createElement('span', { style: { fontSize: 11, color: 'var(--text3)', marginLeft: 6 } }, '.rslvd.net')
+              React.createElement('span', { style: { fontSize: 11, color: 'var(--text3)', marginLeft: 6 } }, '.rslvd.privatedns.org')
             ),
             React.createElement('td', null, React.createElement('span', { style: { fontSize: 13, color: 'var(--text2)' } }, r.reason || '—')),
             React.createElement('td', null, React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, r.created_by_email || 'system')),
@@ -2635,7 +2635,7 @@ function LegalPage({ title, children, navigate }) {
     React.createElement('p', { style: { color: 'var(--text3)', fontSize: 13, marginBottom: 40 } }, 'Last updated: May 26, 2026'),
     children,
     React.createElement('div', { style: { marginTop: 48, paddingTop: 24, borderTop: '1px solid var(--border)', fontSize: 13, color: 'var(--text3)' } },
-      'Questions? Contact us at ', React.createElement('a', { href: 'mailto:legal@rslvd.net', style: { color: 'var(--accent2)' } }, 'legal@rslvd.net')
+      'Questions? Contact us at ', React.createElement('a', { href: 'mailto:legal@rslvd.privatedns.org', style: { color: 'var(--accent2)' } }, 'legal@rslvd.privatedns.org')
     )
   );
 }
@@ -2660,10 +2660,10 @@ function Li({ items }) {
 // ── Terms of Service ──────────────────────────────────────────────────────────
 function TermsPage({ navigate }) {
   return React.createElement(LegalPage, { title: 'Terms of Service', navigate },
-    React.createElement(P, null, 'By accessing or using rslvd.net (the "Service"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Service.'),
+    React.createElement(P, null, 'By accessing or using rslvd.privatedns.org (the "Service"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Service.'),
 
     React.createElement(Section, { title: '1. Description of Service' },
-      React.createElement(P, null, 'rslvd.net provides Dynamic DNS, CGNAT tunnel, and related networking services that allow users to expose local network services to the internet via a permanent subdomain on the rslvd.net domain. The Service is provided "as is" and is subject to change at any time.')
+      React.createElement(P, null, 'rslvd.privatedns.org provides Dynamic DNS, CGNAT tunnel, and related networking services that allow users to expose local network services to the internet via a permanent subdomain on the rslvd.privatedns.org domain. The Service is provided "as is" and is subject to change at any time.')
     ),
 
     React.createElement(Section, { title: '2. Eligibility' },
@@ -2695,7 +2695,7 @@ function TermsPage({ navigate }) {
     ),
 
     React.createElement(Section, { title: '7. Intellectual Property' },
-      React.createElement(P, null, 'rslvd.net and all associated software, branding, and content are the property of rslvd.net. You retain ownership of any content you transmit through the Service. You grant us a limited, non-exclusive licence to route and proxy your traffic solely for the purpose of providing the Service.')
+      React.createElement(P, null, 'rslvd.privatedns.org and all associated software, branding, and content are the property of rslvd.privatedns.org. You retain ownership of any content you transmit through the Service. You grant us a limited, non-exclusive licence to route and proxy your traffic solely for the purpose of providing the Service.')
     ),
 
     React.createElement(Section, { title: '8. Uptime and Availability' },
@@ -2703,7 +2703,7 @@ function TermsPage({ navigate }) {
     ),
 
     React.createElement(Section, { title: '9. Limitation of Liability' },
-      React.createElement(P, null, 'To the maximum extent permitted by law, rslvd.net shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of data, revenue, or profits, arising from your use of the Service. Our total liability to you shall not exceed the amount you paid us in the 12 months preceding the claim.')
+      React.createElement(P, null, 'To the maximum extent permitted by law, rslvd.privatedns.org shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of data, revenue, or profits, arising from your use of the Service. Our total liability to you shall not exceed the amount you paid us in the 12 months preceding the claim.')
     ),
 
     React.createElement(Section, { title: '10. Termination' },
@@ -2711,7 +2711,7 @@ function TermsPage({ navigate }) {
     ),
 
     React.createElement(Section, { title: '11. Governing Law' },
-      React.createElement(P, null, 'These Terms are governed by the laws of the jurisdiction in which rslvd.net operates, without regard to conflict of law principles. Any disputes shall be resolved in the courts of that jurisdiction.')
+      React.createElement(P, null, 'These Terms are governed by the laws of the jurisdiction in which rslvd.privatedns.org operates, without regard to conflict of law principles. Any disputes shall be resolved in the courts of that jurisdiction.')
     ),
 
     React.createElement(Section, { title: '12. Changes to Terms' },
@@ -2723,7 +2723,7 @@ function TermsPage({ navigate }) {
 // ── Privacy Policy ────────────────────────────────────────────────────────────
 function PrivacyPage({ navigate }) {
   return React.createElement(LegalPage, { title: 'Privacy Policy', navigate },
-    React.createElement(P, null, 'This Privacy Policy describes how rslvd.net ("we", "us", "our") collects, uses, and protects information about you when you use the Service.'),
+    React.createElement(P, null, 'This Privacy Policy describes how rslvd.privatedns.org ("we", "us", "our") collects, uses, and protects information about you when you use the Service.'),
 
     React.createElement(Section, { title: '1. Information We Collect' },
       React.createElement(P, null, 'We collect the following information when you use the Service:'),
@@ -2777,7 +2777,7 @@ function PrivacyPage({ navigate }) {
     ),
 
     React.createElement(Section, { title: '9. Your Rights' },
-      React.createElement(P, null, 'You have the right to access, correct, or delete your personal data at any time. You can manage your data from your dashboard or by contacting us at legal@rslvd.net. If you are located in the EU/EEA, you have additional rights under GDPR including the right to data portability and to lodge a complaint with a supervisory authority.')
+      React.createElement(P, null, 'You have the right to access, correct, or delete your personal data at any time. You can manage your data from your dashboard or by contacting us at legal@rslvd.privatedns.org. If you are located in the EU/EEA, you have additional rights under GDPR including the right to data portability and to lodge a complaint with a supervisory authority.')
     ),
 
     React.createElement(Section, { title: '10. Children' },
@@ -2826,7 +2826,7 @@ function InstallBanner({ install }) {
     style: { background: 'var(--accent-bg)', border: '1px solid var(--accent)', borderRadius: 12, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }
   },
     React.createElement('div', null,
-      React.createElement('div', { style: { fontWeight: 600, fontSize: 15, marginBottom: 2 } }, 'Install rslvd.net'),
+      React.createElement('div', { style: { fontWeight: 600, fontSize: 15, marginBottom: 2 } }, 'Install rslvd.privatedns.org'),
       React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)' } }, 'Get the app on your device — manage DNS & tunnels offline, auto-update your IP in the background.')
     ),
     React.createElement('div', { style: { display: 'flex', gap: 8 } },
@@ -3047,12 +3047,12 @@ function TutorialNote({ children }) {
 function TutorialLinuxSubdomain({ navigate }) {
   return React.createElement(TutorialLayout, { title: '🐧 Linux — Dynamic DNS Subdomain Setup', navigate },
     React.createElement('p', { style: { color: 'var(--text2)', fontSize: 15, lineHeight: 1.7, marginBottom: 32 } },
-      'This guide walks you through setting up a free rslvd.net subdomain on Linux so your home server is always reachable by name — even when your IP changes. Takes about 2 minutes.'
+      'This guide walks you through setting up a free rslvd.privatedns.org subdomain on Linux so your home server is always reachable by name — even when your IP changes. Takes about 2 minutes.'
     ),
 
     React.createElement(TutorialStep, { num: '1', title: 'Create a free account' },
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 } },
-        'Go to ', React.createElement('a', { href: 'https://rslvd.net/register', style: { color: 'var(--accent2)' } }, 'rslvd.net/register'), ' and create your account. The free tier includes 1 subdomain — no credit card needed.'
+        'Go to ', React.createElement('a', { href: 'https://rslvd.privatedns.org/register', style: { color: 'var(--accent2)' } }, 'rslvd.privatedns.org/register'), ' and create your account. The free tier includes 1 subdomain — no credit card needed.'
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/register.png', alt: 'Registration page' })
     ),
@@ -3062,7 +3062,7 @@ function TutorialLinuxSubdomain({ navigate }) {
         'After logging in, go to your Dashboard → Hosts tab and click ', React.createElement('strong', null, '+ Add hostname'), '. Enter your desired subdomain name (e.g. "myserver") and click Create.'
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/add-host.png', alt: 'Add hostname modal' }),
-      React.createElement(TutorialNote, null, 'Your subdomain will be yourname.rslvd.net — choose something memorable.')
+      React.createElement(TutorialNote, null, 'Your subdomain will be yourname.rslvd.privatedns.org — choose something memorable.')
     ),
 
     React.createElement(TutorialStep, { num: '3', title: 'Copy your update URL' },
@@ -3071,7 +3071,7 @@ function TutorialLinuxSubdomain({ navigate }) {
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/dashboard-hosts.png', alt: 'Dashboard hosts tab with update URL' }),
       React.createElement(TutorialNote, null,
-        'The URL format is: https://rslvd.net/api/update?key=YOUR_KEY&ip=auto — the "auto" parameter tells the server to detect your public IP automatically.'
+        'The URL format is: https://rslvd.privatedns.org/api/update?key=YOUR_KEY&ip=auto — the "auto" parameter tells the server to detect your public IP automatically.'
       )
     ),
 
@@ -3080,13 +3080,13 @@ function TutorialLinuxSubdomain({ navigate }) {
         'Open a terminal and run the curl command with your update URL to verify it works:'
       ),
       React.createElement('div', { className: 'card', style: { fontFamily: 'monospace', fontSize: 13, padding: '12px 16px', background: 'var(--bg3)', marginTop: 8 } },
-        React.createElement('code', null, 'curl -s "https://rslvd.net/api/update?key=YOUR_UPDATE_KEY&ip=auto"')
+        React.createElement('code', null, 'curl -s "https://rslvd.privatedns.org/api/update?key=YOUR_UPDATE_KEY&ip=auto"')
       ),
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6, marginTop: 8 } },
         'You should see a JSON response confirming the update:'
       ),
       React.createElement('div', { className: 'card', style: { fontFamily: 'monospace', fontSize: 13, padding: '12px 16px', background: 'var(--bg3)', color: '#3fb950', marginTop: 8 } },
-        React.createElement('code', null, '{"success":true,"ip":"203.0.113.42","fqdn":"myserver.rslvd.net"}')
+        React.createElement('code', null, '{"success":true,"ip":"203.0.113.42","fqdn":"myserver.rslvd.privatedns.org"}')
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/terminal-linux-subdomain.png', alt: 'Terminal showing curl update and cron setup' })
     ),
@@ -3102,7 +3102,7 @@ function TutorialLinuxSubdomain({ navigate }) {
         'Add this line at the bottom of your crontab (replace YOUR_UPDATE_KEY with your actual key):'
       ),
       React.createElement('div', { className: 'card', style: { fontFamily: 'monospace', fontSize: 13, padding: '12px 16px', background: 'var(--bg3)', marginTop: 8 } },
-        React.createElement('code', null, '*/5 * * * * curl -s "https://rslvd.net/api/update?key=YOUR_UPDATE_KEY&ip=auto" > /dev/null')
+        React.createElement('code', null, '*/5 * * * * curl -s "https://rslvd.privatedns.org/api/update?key=YOUR_UPDATE_KEY&ip=auto" > /dev/null')
       ),
       React.createElement(TutorialNote, null,
         'This runs every 5 minutes. If your IP changes, it updates within 5 minutes automatically. You can also use systemd timers for more control.'
@@ -3120,7 +3120,7 @@ function TutorialLinuxSubdomain({ navigate }) {
         'Then verify DNS resolution:'
       ),
       React.createElement('div', { className: 'card', style: { fontFamily: 'monospace', fontSize: 13, padding: '12px 16px', background: 'var(--bg3)', marginTop: 8 } },
-        React.createElement('code', null, 'dig +short myserver.rslvd.net')
+        React.createElement('code', null, 'dig +short myserver.rslvd.privatedns.org')
       ),
       React.createElement(TutorialNote, null, 'DNS propagation usually happens within 60 seconds. If it doesn\'t resolve yet, wait a minute and try again.')
     ),
@@ -3139,12 +3139,12 @@ function TutorialLinuxSubdomain({ navigate }) {
 function TutorialWindowsSubdomain({ navigate }) {
   return React.createElement(TutorialLayout, { title: '🪟 Windows — Dynamic DNS Subdomain Setup', navigate },
     React.createElement('p', { style: { color: 'var(--text2)', fontSize: 15, lineHeight: 1.7, marginBottom: 32 } },
-      'This guide walks you through setting up a free rslvd.net subdomain on Windows so your home server is always reachable by name — even when your IP changes. Takes about 2 minutes.'
+      'This guide walks you through setting up a free rslvd.privatedns.org subdomain on Windows so your home server is always reachable by name — even when your IP changes. Takes about 2 minutes.'
     ),
 
     React.createElement(TutorialStep, { num: '1', title: 'Create a free account' },
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 } },
-        'Go to ', React.createElement('a', { href: 'https://rslvd.net/register', style: { color: 'var(--accent2)' } }, 'rslvd.net/register'), ' and create your account. The free tier includes 1 subdomain — no credit card needed.'
+        'Go to ', React.createElement('a', { href: 'https://rslvd.privatedns.org/register', style: { color: 'var(--accent2)' } }, 'rslvd.privatedns.org/register'), ' and create your account. The free tier includes 1 subdomain — no credit card needed.'
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/register.png', alt: 'Registration page' })
     ),
@@ -3154,7 +3154,7 @@ function TutorialWindowsSubdomain({ navigate }) {
         'After logging in, go to your Dashboard → Hosts tab and click ', React.createElement('strong', null, '+ Add hostname'), '. Enter your desired subdomain name (e.g. "myserver") and click Create.'
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/add-host.png', alt: 'Add hostname modal' }),
-      React.createElement(TutorialNote, null, 'Your subdomain will be yourname.rslvd.net — choose something memorable.')
+      React.createElement(TutorialNote, null, 'Your subdomain will be yourname.rslvd.privatedns.org — choose something memorable.')
     ),
 
     React.createElement(TutorialStep, { num: '3', title: 'Copy your update URL' },
@@ -3169,13 +3169,13 @@ function TutorialWindowsSubdomain({ navigate }) {
         'Open ', React.createElement('strong', null, 'PowerShell'), ' (right-click Start → Windows PowerShell) and run:'
       ),
       React.createElement('div', { className: 'card', style: { fontFamily: 'monospace', fontSize: 13, padding: '12px 16px', background: 'var(--bg3)', marginTop: 8 } },
-        React.createElement('code', null, 'Invoke-RestMethod "https://rslvd.net/api/update?key=YOUR_UPDATE_KEY&ip=auto"')
+        React.createElement('code', null, 'Invoke-RestMethod "https://rslvd.privatedns.org/api/update?key=YOUR_UPDATE_KEY&ip=auto"')
       ),
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6, marginTop: 8 } },
         'You should see:'
       ),
       React.createElement('div', { className: 'card', style: { fontFamily: 'monospace', fontSize: 13, padding: '12px 16px', background: 'var(--bg3)', color: '#3fb950', marginTop: 8 } },
-        React.createElement('code', null, 'success : True\nip      : 203.0.113.42\nfqdn    : myserver.rslvd.net')
+        React.createElement('code', null, 'success : True\nip      : 203.0.113.42\nfqdn    : myserver.rslvd.privatedns.org')
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/terminal-windows-subdomain.png', alt: 'PowerShell DDNS update' })
     ),
@@ -3188,13 +3188,13 @@ function TutorialWindowsSubdomain({ navigate }) {
         React.createElement('code', null,
           '$action = New-ScheduledTaskAction `\n',
           '  -Execute "powershell.exe" `\n',
-          '  -Argument \'-Command "Invoke-RestMethod \'\'https://rslvd.net/api/update?key=YOUR_UPDATE_KEY&ip=auto\'\'"\'\n\n',
+          '  -Argument \'-Command "Invoke-RestMethod \'\'https://rslvd.privatedns.org/api/update?key=YOUR_UPDATE_KEY&ip=auto\'\'"\'\n\n',
           '$trigger = New-ScheduledTaskTrigger `\n',
           '  -RepetitionInterval (New-TimeSpan -Minutes 5) `\n',
           '  -Once -At (Get-Date)\n\n',
           'Register-ScheduledTask -TaskName "rslvd-ddns" `\n',
           '  -Action $action -Trigger $trigger `\n',
-          '  -Description "Update rslvd.net DDNS"'
+          '  -Description "Update rslvd.privatedns.org DDNS"'
         )
       ),
       React.createElement(TutorialNote, null,
@@ -3213,7 +3213,7 @@ function TutorialWindowsSubdomain({ navigate }) {
         'Test DNS resolution:'
       ),
       React.createElement('div', { className: 'card', style: { fontFamily: 'monospace', fontSize: 13, padding: '12px 16px', background: 'var(--bg3)', marginTop: 8 } },
-        React.createElement('code', null, 'nslookup myserver.rslvd.net')
+        React.createElement('code', null, 'nslookup myserver.rslvd.privatedns.org')
       ),
       React.createElement(TutorialNote, null, 'DNS propagation usually happens within 60 seconds.')
     ),
@@ -3232,12 +3232,12 @@ function TutorialWindowsSubdomain({ navigate }) {
 function TutorialLinuxTunnel({ navigate }) {
   return React.createElement(TutorialLayout, { title: '🐧 Linux — CGNAT Tunnel Setup', navigate },
     React.createElement('p', { style: { color: 'var(--text2)', fontSize: 15, lineHeight: 1.7, marginBottom: 32 } },
-      'This guide shows you how to expose a local service (like a web server on localhost:3000) to the internet using an rslvd.net tunnel — even if you\'re behind CGNAT or double NAT. Takes about 1 minute.'
+      'This guide shows you how to expose a local service (like a web server on localhost:3000) to the internet using an rslvd.privatedns.org tunnel — even if you\'re behind CGNAT or double NAT. Takes about 1 minute.'
     ),
 
     React.createElement(TutorialStep, { num: '1', title: 'Create a free account' },
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 } },
-        'Go to ', React.createElement('a', { href: 'https://rslvd.net/register', style: { color: 'var(--accent2)' } }, 'rslvd.net/register'), ' and sign up. Free tier includes 2 tunnels — no credit card required.'
+        'Go to ', React.createElement('a', { href: 'https://rslvd.privatedns.org/register', style: { color: 'var(--accent2)' } }, 'rslvd.privatedns.org/register'), ' and sign up. Free tier includes 2 tunnels — no credit card required.'
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/register.png', alt: 'Registration page' })
     ),
@@ -3254,7 +3254,7 @@ function TutorialLinuxTunnel({ navigate }) {
         'Click ', React.createElement('strong', null, '⚡ Connect'), ' on your tunnel card and select the ', React.createElement('strong', null, '🐧 Linux / Mac / Termux'), ' tab. Run the install command:'
       ),
       React.createElement('div', { className: 'card', style: { fontFamily: 'monospace', fontSize: 13, padding: '12px 16px', background: 'var(--bg3)', marginTop: 8 } },
-        React.createElement('code', null, 'curl -fsSL https://rslvd.net/install.sh | bash')
+        React.createElement('code', null, 'curl -fsSL https://rslvd.privatedns.org/install.sh | bash')
       ),
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6, marginTop: 8 } },
         'This downloads the correct binary for your architecture (amd64, arm64, etc.) and installs it to /usr/local/bin.'
@@ -3281,7 +3281,7 @@ function TutorialLinuxTunnel({ navigate }) {
 
     React.createElement(TutorialStep, { num: '5', title: 'Access your service' },
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 } },
-        'Your service is now live at ', React.createElement('strong', null, 'https://yourname.rslvd.net'), '. Open it in any browser from anywhere in the world. All traffic is encrypted via our wildcard SSL certificate.'
+        'Your service is now live at ', React.createElement('strong', null, 'https://yourname.rslvd.privatedns.org'), '. Open it in any browser from anywhere in the world. All traffic is encrypted via our wildcard SSL certificate.'
       ),
       React.createElement(TutorialNote, null, 'The tunnel stays active as long as the rslvd-tunnel process is running. To run it as a background service, see Step 6.')
     ),
@@ -3294,7 +3294,7 @@ function TutorialLinuxTunnel({ navigate }) {
         React.createElement('code', null,
           'sudo tee /etc/systemd/system/rslvd-tunnel.service << EOF\n' +
           '[Unit]\n' +
-          'Description=rslvd.net tunnel\n' +
+          'Description=rslvd.privatedns.org tunnel\n' +
           'After=network-online.target\n' +
           'Wants=network-online.target\n\n' +
           '[Service]\n' +
@@ -3324,12 +3324,12 @@ function TutorialLinuxTunnel({ navigate }) {
 function TutorialWindowsTunnel({ navigate }) {
   return React.createElement(TutorialLayout, { title: '🪟 Windows — CGNAT Tunnel Setup', navigate },
     React.createElement('p', { style: { color: 'var(--text2)', fontSize: 15, lineHeight: 1.7, marginBottom: 32 } },
-      'This guide shows you how to expose a local service (like a web server on localhost:3000) to the internet using an rslvd.net tunnel on Windows — even behind CGNAT. Takes about 1 minute.'
+      'This guide shows you how to expose a local service (like a web server on localhost:3000) to the internet using an rslvd.privatedns.org tunnel on Windows — even behind CGNAT. Takes about 1 minute.'
     ),
 
     React.createElement(TutorialStep, { num: '1', title: 'Create a free account' },
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 } },
-        'Go to ', React.createElement('a', { href: 'https://rslvd.net/register', style: { color: 'var(--accent2)' } }, 'rslvd.net/register'), ' and sign up. Free tier includes 2 tunnels — no credit card required.'
+        'Go to ', React.createElement('a', { href: 'https://rslvd.privatedns.org/register', style: { color: 'var(--accent2)' } }, 'rslvd.privatedns.org/register'), ' and sign up. Free tier includes 2 tunnels — no credit card required.'
       ),
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/register.png', alt: 'Registration page' })
     ),
@@ -3347,7 +3347,7 @@ function TutorialWindowsTunnel({ navigate }) {
       ),
       React.createElement('div', { style: { marginTop: 8 } },
         React.createElement('a', {
-          href: 'https://rslvd.net/dl/rslvd-tunnel-windows-amd64.exe',
+          href: 'https://rslvd.privatedns.org/dl/rslvd-tunnel-windows-amd64.exe',
           className: 'btn btn-secondary btn-sm',
           style: { display: 'inline-flex', alignItems: 'center', gap: 6 }
         }, '⬇ Download rslvd-tunnel-windows-amd64.exe')
@@ -3375,7 +3375,7 @@ function TutorialWindowsTunnel({ navigate }) {
 
     React.createElement(TutorialStep, { num: '5', title: 'Access your service' },
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 } },
-        'Your service is now live at ', React.createElement('strong', null, 'https://yourname.rslvd.net'), '. Open it in any browser from anywhere. HTTPS is automatic via our wildcard SSL certificate.'
+        'Your service is now live at ', React.createElement('strong', null, 'https://yourname.rslvd.privatedns.org'), '. Open it in any browser from anywhere. HTTPS is automatic via our wildcard SSL certificate.'
       )
     ),
 
@@ -3392,7 +3392,7 @@ function TutorialWindowsTunnel({ navigate }) {
           'Register-ScheduledTask -TaskName "rslvd-tunnel" `\n' +
           '  -Action $action -Trigger $trigger `\n' +
           '  -RunLevel Highest `\n' +
-          '  -Description "rslvd.net tunnel"'
+          '  -Description "rslvd.privatedns.org tunnel"'
         )
       ),
       React.createElement(TutorialNote, null, 'Replace the path and token with your actual values. The task runs at system startup with elevated privileges.')
@@ -3420,7 +3420,7 @@ function TutorialsPage({ navigate }) {
   return React.createElement('div', { style: { maxWidth: 800, margin: '0 auto', padding: '32px 24px' } },
     React.createElement('button', { className: 'btn btn-secondary btn-sm', style: { marginBottom: 24 }, onClick: () => navigate('/') }, '← Back'),
     React.createElement('h1', { style: { fontSize: 28, marginBottom: 8 } }, 'Tutorials'),
-    React.createElement('p', { style: { color: 'var(--text2)', fontSize: 15, marginBottom: 32 } }, 'Step-by-step guides to get up and running with rslvd.net.'),
+    React.createElement('p', { style: { color: 'var(--text2)', fontSize: 15, marginBottom: 32 } }, 'Step-by-step guides to get up and running with rslvd.privatedns.org.'),
     tutorials.map(t =>
       React.createElement('div', {
         key: t.path,
@@ -3505,7 +3505,7 @@ function LegalWall({ user, onAccepted }) {
     React.createElement('div', { className: 'card', style: { maxWidth: 520, width: '90%', padding: 32 } },
       React.createElement('h2', { style: { marginBottom: 8 } }, 'Updated Terms & Privacy Policy'),
       React.createElement('p', { style: { color: 'var(--text2)', marginBottom: 16, fontSize: 14, lineHeight: 1.6 } },
-        'Our Terms of Service, EULA, and/or Privacy Policy have been updated. Please review and accept to continue using rslvd.net.'
+        'Our Terms of Service, EULA, and/or Privacy Policy have been updated. Please review and accept to continue using rslvd.privatedns.org.'
       ),
       React.createElement('div', { style: { marginBottom: 16, fontSize: 14 } },
         React.createElement('a', { href: '/terms', target: '_blank', style: { color: 'var(--accent2)', marginRight: 16 } }, 'Terms of Service'),
@@ -3545,7 +3545,7 @@ function DownloadsPage({ navigate }) {
         { label: 'Binary — mips', file: 'rslvd-tunnel-linux-mips', size: '2.3 MB' },
         { label: 'Binary — mipsle', file: 'rslvd-tunnel-linux-mipsle', size: '2.3 MB' },
       ],
-      install: 'curl -fsSL https://rslvd.net/install.sh | bash',
+      install: 'curl -fsSL https://rslvd.privatedns.org/install.sh | bash',
     },
     {
       id: 'windows',
@@ -3566,7 +3566,7 @@ function DownloadsPage({ navigate }) {
         { label: 'Binary — Apple Silicon (arm64)', file: 'rslvd-tunnel-darwin-arm64', size: '2.0 MB', recommended: true },
         { label: 'Binary — Intel (amd64)', file: 'rslvd-tunnel-darwin-amd64', size: '2.0 MB' },
       ],
-      install: 'curl -fsSL https://rslvd.net/install.sh | bash',
+      install: 'curl -fsSL https://rslvd.privatedns.org/install.sh | bash',
     },
     {
       id: 'router',
@@ -3578,7 +3578,7 @@ function DownloadsPage({ navigate }) {
         { label: 'Binary — mipsle (little endian)', file: 'rslvd-tunnel-linux-mipsle', size: '2.3 MB' },
         { label: 'Binary — arm', file: 'rslvd-tunnel-linux-arm', size: '1.9 MB' },
       ],
-      install: 'wget -O- https://rslvd.net/install-openwrt.sh | sh',
+      install: 'wget -O- https://rslvd.privatedns.org/install-openwrt.sh | sh',
     },
   ];
 
@@ -3594,7 +3594,7 @@ function DownloadsPage({ navigate }) {
     // Quick install box
     React.createElement('div', { className: 'card', style: { marginBottom: 32, background: 'var(--bg2)', border: '1px solid var(--accent)', borderRadius: 8 } },
       React.createElement('h3', { style: { marginBottom: 8, fontSize: 15 } }, '⚡ One-line install (Linux / macOS)'),
-      React.createElement(CopyBox, { text: 'curl -fsSL https://rslvd.net/install.sh | bash' }),
+      React.createElement(CopyBox, { text: 'curl -fsSL https://rslvd.privatedns.org/install.sh | bash' }),
       React.createElement('p', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 8 } },
         'Auto-detects your OS and architecture. Installs to ~/.local/bin.'
       )
@@ -3647,7 +3647,7 @@ function DownloadsPage({ navigate }) {
         React.createElement('p', null, '1. ', React.createElement('a', { href: '/register', onClick: e => { e.preventDefault(); navigate('/register'); }, style: { color: 'var(--accent2)' } }, 'Create a free account'), ' if you haven\'t already.'),
         React.createElement('p', null, '2. Create a tunnel from your ', React.createElement('a', { href: '/dashboard', onClick: e => { e.preventDefault(); navigate('/dashboard'); }, style: { color: 'var(--accent2)' } }, 'Dashboard'), '.'),
         React.createElement('p', null, '3. Run: ', React.createElement('code', { style: { background: 'var(--bg2)', padding: '2px 6px', borderRadius: 3 } }, 'rslvd-tunnel YOUR_TOKEN 8080')),
-        React.createElement('p', null, '4. Your service is now live at ', React.createElement('code', { style: { background: 'var(--bg2)', padding: '2px 6px', borderRadius: 3 } }, 'yourname.rslvd.net'), '!')
+        React.createElement('p', null, '4. Your service is now live at ', React.createElement('code', { style: { background: 'var(--bg2)', padding: '2px 6px', borderRadius: 3 } }, 'yourname.rslvd.privatedns.org'), '!')
       )
     ),
 
