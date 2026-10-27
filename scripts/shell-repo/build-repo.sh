@@ -47,7 +47,7 @@ build_rslvd_tunnel() {
         *) echo "unknown arch $arch" >&2; return 1 ;;
     esac
     local version
-    version="1.3.0"
+    version="1.4.0"
     local pkgdir
     pkgdir="$(mktemp -d)"
     local prefix="$pkgdir/data/data/net.rslvd.debug/files/usr"
@@ -60,7 +60,7 @@ Package: rslvd-tunnel
 Version: $version
 Architecture: $deb_arch
 Maintainer: rslvd.net
-Description: rslvd.net tunnel client (TCP/UDP/DNS2TCP reverse tunnels)
+Description: rslvd.net tunnel client (TCP/UDP + premium SSH/ADB remote access)
 Homepage: https://rslvd.net
 EOF
     dpkg-deb --root-owner-group -Zxz -b "$pkgdir" \

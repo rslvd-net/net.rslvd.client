@@ -132,6 +132,7 @@ function Landing({ navigate }) {
     { icon: '🔗', title: 'DynDNS Compatible', desc: 'Drop-in replacement for any DynDNS client. Works with Asus, Synology, Ubiquiti, pfSense, and more.' },
     { icon: '🔒', title: 'Token Security', desc: 'Each host and tunnel gets its own unique token. Revoke or rotate instantly from your dashboard.' },
     { icon: '📱', title: 'Every Platform', desc: 'Single binary for Linux, macOS, Windows, Android (Termux), and routers. No dependencies, no runtime.' },
+    { icon: '🛰', title: 'Remote ADB & SSH', desc: 'Paid plans get raw-port tunnels: a real TCP port on rslvd.net for adb connect, ssh -p, RDP and more — no port forwarding, no VPN.' },
     { icon: '⚡', title: 'Instant Setup', desc: 'Register, grab your token, run one command. Your tunnel is live in under 30 seconds.' },
   ];
 
@@ -140,6 +141,7 @@ function Landing({ navigate }) {
     { icon: '💻', title: 'Dev & Testing', desc: 'Share a localhost dev server with a client or teammate instantly. No VPN, no ngrok account, no bandwidth limits.' },
     { icon: '📹', title: 'IP Cameras & NVRs', desc: 'Access your cameras remotely without a static IP. Point rslvd.privatedns.org at your NVR and you\'re done.' },
     { icon: '🌍', title: 'Remote Access', desc: 'SSH, RDP, VNC — tunnel any protocol. Access your home PC or office server from anywhere.' },
+    { icon: '🛰', title: 'ADB & SSH Tunnels', desc: 'Premium raw-port tunnels give you rslvd.net:<port> — adb connect to a phone or ssh into a box behind CGNAT from anywhere in the world.' },
   ];
 
   const faqs = [
@@ -147,6 +149,7 @@ function Landing({ navigate }) {
     { q: 'How is this different from ngrok?', a: 'rslvd.privatedns.org gives you a permanent subdomain (not a random URL), supports WebSockets, works on routers and Android, has no session time limits, and costs a fraction of the price.' },
     { q: 'Does the tunnel support HTTPS?', a: 'Yes. All tunnels are served over HTTPS via *.rslvd.privatedns.org — our wildcard SSL certificate covers every subdomain. Your traffic is encrypted end-to-end from browser to server.' },
     { q: 'Can I run multiple tunnels?', a: 'Yes. Free tier gets 2 tunnels. Paid plans scale up to unlimited. Each tunnel gets its own subdomain and token.' },
+    { q: 'Can I reach my phone or SSH server from anywhere?', a: 'Yes — on any paid plan. SSH (-ssh) and ADB (-adb) tunnels publish a real TCP port on rslvd.net, so from any machine you can run "adb connect rslvd.net:<port>" or "ssh -p <port> user@rslvd.net". Perfect for a home server or an Android device behind CGNAT.' },
     { q: 'Does it work on OpenWRT / DD-WRT?', a: 'Yes — dedicated one-line installers for both. Auto-detects your router\'s architecture (MIPS, ARM, x86) and persistent storage location.' },
   ];
 
@@ -258,6 +261,9 @@ function Landing({ navigate }) {
             React.createElement('li', null, 'WebSocket support'),
             React.createElement('li', null, 'IPv4 + IPv6'),
             React.createElement('li', null, 'DynDNS compatible'),
+            p.key !== 'free'
+              ? React.createElement('li', null, '🛰 Remote ADB & SSH access')
+              : React.createElement('li', { style: { color: 'var(--text3)' } }, '🛰 ADB/SSH on paid plans'),
             p.key === 'free' && React.createElement('li', null, 'No credit card')
           ),
           React.createElement('button', { className: 'btn btn-primary w-full', onClick: () => navigate('/register') },
@@ -691,11 +697,22 @@ function SupportPage({ user, navigate }) {
   );
 }
 
+// ── Remote access (premium SSH / ADB raw-port tunnels) ────────────────────────
+const REMOTE_PROTOCOLS = ['ssh', 'adb'];
+const isRemoteProtocol = (p) => REMOTE_PROTOCOLS.includes(String(p || '').toLowerCase());
+const hasRemoteAccess = (user) => !!(user && (
+  user.isSiteOwner || user.role === 'site_owner' || user.role === 'admin' ||
+  (user.plan && user.plan !== 'free' && user.status !== 'free' && user.status !== 'inactive')
+));
+const protocolFlagFor = (p) => (p === 'udp' ? '-udp ' : isRemoteProtocol(p) ? `-${String(p).toLowerCase()} ` : '');
+
 // ── Tunnel Modal ──────────────────────────────────────────────────────────────
 function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
   const [name, setName] = useState('');
   const [targetPort, setTargetPort] = useState('');
   const [protocol, setProtocol] = useState('tcp');
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const remoteOk = hasRemoteAccess(user);
   const [isNested, setIsNested] = useState(false);
   const [parentId, setParentId] = useState('');
   const [error, setError] = useState('');
@@ -713,6 +730,7 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
   const presets = [
     { label: 'Web', port: 80 }, { label: 'HTTPS', port: 443 },
     { label: 'Dev', port: 3000 }, { label: 'Alt', port: 8080 },
+    { label: 'SSH', port: 22 }, { label: 'ADB', port: 5555 },
     { label: 'Minecraft', port: 25565 }, { label: 'Custom', port: '' },
   ];
 
@@ -734,7 +752,7 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
     ),
     React.createElement('form', { onSubmit: submit },
 
-      canNest && topLevelTunnels.length > 0 && React.createElement('div', { className: 'form-group' },
+      canNest && topLevelTunnels.length > 0 && !isRemoteProtocol(protocol) && React.createElement('div', { className: 'form-group' },
         React.createElement('label', { className: 'form-label' }, 'Tunnel type'),
         React.createElement('div', { style: { display: 'flex', gap: 8 } },
           React.createElement('button', { type: 'button', className: `btn btn-sm ${!isNested ? 'btn-primary' : 'btn-secondary'}`, onClick: () => setIsNested(false) }, '🌐 Top-level subdomain'),
@@ -785,23 +803,34 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
 
       React.createElement('div', { className: 'form-group' },
         React.createElement('label', { className: 'form-label' }, 'Protocol'),
-        React.createElement('div', { style: { display: 'flex', gap: 8 } },
+        React.createElement('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
           [
             { key: 'tcp', label: '🔌 TCP', desc: 'Standard tunnel for HTTP/WebSocket' },
             { key: 'udp', label: '📡 UDP', desc: 'For DNS, VoIP, games' },
-            { key: 'dns2tcp', label: '🌊 DNS2TCP', desc: 'Tunnels TCP over DNS queries' }
+            { key: 'ssh', label: '🐚 SSH', desc: 'Premium — real public port straight to your SSH daemon', premium: true },
+            { key: 'adb', label: '🤖 ADB', desc: 'Premium — adb connect to your device from anywhere', premium: true }
           ].map(p => React.createElement('button', {
             key: p.key, type: 'button',
             className: `btn btn-sm ${protocol === p.key ? 'btn-primary' : 'btn-secondary'}`,
-            onClick: () => setProtocol(p.key),
+            onClick: () => {
+              if (p.premium && !remoteOk) { setShowUpgrade(true); return; }
+              setShowUpgrade(false);
+              setProtocol(p.key);
+              if (p.key === 'ssh') setTargetPort('22');
+              if (p.key === 'adb') setTargetPort('5555');
+            },
             title: p.desc,
-            style: { flex: 1 }
-          }, p.label))
+            style: { flex: 1, minWidth: 96 }
+          }, p.label + (p.premium && !remoteOk ? ' 🔒' : '')))
+        ),
+        showUpgrade && React.createElement('div', { className: 'alert alert-info', style: { marginTop: 10, marginBottom: 0 } },
+          '🔒 SSH and ADB tunnels are a premium feature. They publish a real TCP port (20000-29999) on rslvd.net so any SSH or adb client can reach this machine — available on every paid plan.'
         ),
         React.createElement('p', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 6 } },
           protocol === 'tcp' && 'Works with HTTP, HTTPS, WebSockets, SSH, RDP — any TCP protocol.',
           protocol === 'udp' && 'For DNS servers, VoIP, game servers, or any UDP application. Requires UDP-compatible client.',
-          protocol === 'dns2tcp' && 'Bypasses firewalls by encoding TCP data in DNS queries. Slow but works almost anywhere.'
+          protocol === 'ssh' && 'Publishes rslvd.net:<port> straight to your SSH daemon. Connect with: ssh -p <port> <user>@rslvd.net',
+          protocol === 'adb' && 'Publishes rslvd.net:<port> to a phone\u2019s adb (5555) or a PC\u2019s adb server (5037). Connect with: adb connect rslvd.net:<port>'
         )
       ),
 
@@ -844,7 +873,7 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
 
   const handleDeviceLockToggle = async () => {
     const next = !deviceLock;
-    if (next && !confirm('Enable device lock? The first device to connect will be permanently bound to this tunnel\u2019s token \u2014 other devices will be rejected. (DNS2TCP tunnels can\u2019t use device lock.)')) return;
+    if (next && !confirm('Enable device lock? The first device to connect will be permanently bound to this tunnel\u2019s token \u2014 other devices will be rejected.')) return;
     setLockBusy(true);
     try {
       await API.patch(`/tunnels/${t.id}/device-lock`, { device_lock: next });
@@ -869,9 +898,18 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
   const useHttps = t.force_https !== false;
   const publicUrl = `${useHttps ? 'https' : 'http'}://${fqdn}`;
   const localHost = t.target_host || 'localhost';
-  
+  const remote = isRemoteProtocol(protocol);
+  const remoteHost = t.remote_host || 'rslvd.net';
+  const remotePort = t.remote_port || t.tunnel_port;
+  const remoteEndpoint = `${remoteHost}:${remotePort || '<port>'}`;
+  const remoteConnectCmd = protocol === 'ssh'
+    ? `ssh -p ${remotePort || '<port>'} <user>@${remoteHost}`
+    : (t.target_port === 5037
+        ? `adb -H ${remoteHost} -P ${remotePort || '<port>'} devices`
+        : `adb connect ${remoteEndpoint}`);
+
   // Protocol-specific connection commands
-  const protocolFlag = protocol === 'udp' ? '-udp ' : protocol === 'dns2tcp' ? '-dns ' : '';
+  const protocolFlag = protocolFlagFor(protocol);
   const installCmd = `curl -fsSL https://rslvd.privatedns.org/install.sh | bash`;
   const clientCmd = `rslvd-tunnel ${protocolFlag}${t.token} ${t.target_port}`;
   const winDlUrl = `https://rslvd.privatedns.org/dl/rslvd-tunnel-windows-amd64.exe`;
@@ -887,18 +925,18 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
           React.createElement('a', { href: publicUrl, target: '_blank', rel: 'noopener noreferrer', style: { fontWeight: 600, fontSize: 15, color: 'var(--text)', textDecoration: 'none' } }, fqdn)
         ),
         React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)', marginTop: 2 } },
-          protocol.toUpperCase(), ' ', `localhost:${t.target_port} → `, React.createElement('strong', null, publicUrl)
+          protocol.toUpperCase(), ' ', `localhost:${t.target_port} → `, React.createElement('strong', null, remote ? remoteEndpoint : publicUrl)
         )
       ),
       React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
-        React.createElement('span', { className: 'badge badge-purple', style: { fontSize: 10, textTransform: 'uppercase' } }, protocol),
-        React.createElement('button', {
+        React.createElement('span', { className: `badge badge-${remote ? 'yellow' : 'purple'}`, style: { fontSize: 10, textTransform: 'uppercase' } }, remote ? `${protocol} · premium` : protocol),
+        !remote && React.createElement('button', {
           className: `btn btn-sm ${useHttps ? 'btn-secondary' : 'btn-secondary'}`,
           onClick: handleHttpsToggle, disabled: toggling,
           title: useHttps ? 'HTTPS enabled (click to switch to HTTP)' : 'HTTP only (click to enable HTTPS)',
           style: { fontSize: 11, padding: '2px 8px', minWidth: 60, opacity: toggling ? 0.6 : 1 }
         }, toggling ? '...' : (useHttps ? '🔒 HTTPS' : '🔓 HTTP')),
-        protocol !== 'dns2tcp' && React.createElement('button', {
+        React.createElement('button', {
           className: 'btn btn-sm btn-secondary',
           onClick: handleDeviceLockToggle, disabled: lockBusy,
           title: deviceLock ? 'Device lock on — token bound to one device (click to disable)' : 'Device lock off — any device with the token can connect (click to enable)',
@@ -945,7 +983,21 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
             React.createElement('div', { className: 'step-title' }, 'Start tunnel'),
             React.createElement(CopyBox, { text: clientCmd }),
             React.createElement('p', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 6 } },
-              `Your ${localHost}:${t.target_port} → `, React.createElement('a', { href: publicUrl, target: '_blank', style: { color: 'var(--accent2)' } }, publicUrl)
+              remote
+                ? `Your ${localHost}:${t.target_port} → ${remoteEndpoint}`
+                : React.createElement(React.Fragment, null, `Your ${localHost}:${t.target_port} → `, React.createElement('a', { href: publicUrl, target: '_blank', style: { color: 'var(--accent2)' } }, publicUrl))
+            )
+          )
+        ),
+        remote && React.createElement('div', { className: 'connect-step' },
+          React.createElement('div', { className: 'step-num' }, '3'),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('div', { className: 'step-title' }, protocol === 'ssh' ? 'Connect over SSH from anywhere' : 'Connect with adb from anywhere'),
+            React.createElement(CopyBox, { text: remoteConnectCmd }),
+            React.createElement('p', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 6 } },
+              t.connected
+                ? `Live now on ${remoteEndpoint} — no port forwarding, no VPN.`
+                : `Waiting for the client above, then ${remoteEndpoint} will be live.`
             )
           )
         )
@@ -1015,9 +1067,12 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
         )
       ),
 
-      React.createElement('div', { style: { marginTop: 12, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 8, fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 8 } },
-        '🔗 Public URL: ',
-        React.createElement('a', { href: publicUrl, target: '_blank', style: { color: 'var(--accent2)', fontWeight: 600 } }, publicUrl)
+      React.createElement('div', { style: { marginTop: 12, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 8, fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+        remote ? '🛰 Public endpoint: ' : '🔗 Public URL: ',
+        remote
+          ? React.createElement('strong', { style: { color: 'var(--accent2)', fontFamily: 'JetBrains Mono, monospace' } }, remoteEndpoint)
+          : React.createElement('a', { href: publicUrl, target: '_blank', style: { color: 'var(--accent2)', fontWeight: 600 } }, publicUrl),
+        remote && React.createElement('span', null, `· ${remoteConnectCmd}`)
       ),
 
       deviceLock && React.createElement('div', { style: { marginTop: 8, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 8, fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
@@ -1619,6 +1674,25 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         React.createElement('a', { href: '/tutorials/linux-tunnel', onClick: e => { e.preventDefault(); navigate('/tutorials/linux-tunnel'); }, style: { color: 'var(--accent2)', fontWeight: 600 } }, '🐧 Linux tutorial'),
         ' · ',
         React.createElement('a', { href: '/tutorials/windows-tunnel', onClick: e => { e.preventDefault(); navigate('/tutorials/windows-tunnel'); }, style: { color: 'var(--accent2)', fontWeight: 600 } }, '🪟 Windows tutorial')
+      ),
+
+      // Remote access (premium SSH/ADB) banner
+      React.createElement('div', { className: 'card mb-4', style: { display: 'flex', gap: 14, alignItems: 'flex-start', borderColor: hasRemoteAccess(user) ? 'var(--border)' : 'var(--accent)' } },
+        React.createElement('div', { style: { fontSize: 24 } }, '🛰'),
+        React.createElement('div', { style: { flex: 1 } },
+          React.createElement('h3', { style: { marginBottom: 4, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 } },
+            'Remote access — SSH & ADB over the internet',
+            React.createElement('span', { className: 'badge badge-yellow', style: { fontSize: 10 } }, 'PREMIUM')
+          ),
+          React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, margin: 0 } },
+            hasRemoteAccess(user)
+              ? 'Create an SSH or ADB tunnel and it gets a real public port on rslvd.net (20000-29999): connect with "ssh -p <port> <user>@rslvd.net" or "adb connect rslvd.net:<port>".'
+              : 'SSH and ADB tunnels publish a real public port on rslvd.net so you can reach a machine — or a phone — behind CGNAT from anywhere. Included in every paid plan.'
+          ),
+          !hasRemoteAccess(user) && React.createElement('button', {
+            className: 'btn btn-primary btn-sm', style: { marginTop: 10 }, onClick: () => setTab('billing')
+          }, '🔒 Unlock remote access')
+        )
       ),
       tunnels.length === 0
         ? React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 48 } },
@@ -3246,7 +3320,7 @@ function TutorialLinuxTunnel({ navigate }) {
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 } },
         'Go to Dashboard → Tunnels tab and click ', React.createElement('strong', null, '+ New tunnel'), '. Choose a subdomain name, set the target port (the local port your service runs on, e.g. 3000), and select the protocol (TCP is the default).'
       ),
-      React.createElement(TutorialNote, null, 'TCP works for HTTP, HTTPS, WebSockets, SSH, and most protocols. Use UDP for game servers or VoIP. Use DNS2TCP only if your network blocks all other traffic.')
+      React.createElement(TutorialNote, null, 'TCP works for HTTP, HTTPS, WebSockets, SSH, and most protocols. Use UDP for game servers or VoIP. On a paid plan, -ssh and -adb tunnels publish a real public port so SSH and adb clients can connect from anywhere.')
     ),
 
     React.createElement(TutorialStep, { num: '3', title: 'Install the tunnel client' },
@@ -3275,7 +3349,7 @@ function TutorialLinuxTunnel({ navigate }) {
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/terminal-linux-tunnel.png', alt: 'Terminal showing tunnel running' }),
       React.createElement(TutorialNote, null,
         'For UDP services, use: rslvd-tunnel -udp YOUR_TOKEN PORT\n' +
-        'For DNS2TCP mode, use: rslvd-tunnel -dns YOUR_TOKEN PORT'
+        'Remote access (paid plans): rslvd-tunnel -ssh YOUR_TOKEN 22  →  ssh -p <public-port> you@rslvd.net'
       )
     ),
 
@@ -3369,7 +3443,7 @@ function TutorialWindowsTunnel({ navigate }) {
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/terminal-windows-tunnel.png', alt: 'PowerShell running tunnel' }),
       React.createElement(TutorialNote, null,
         'For UDP: .\\rslvd-tunnel-windows-amd64.exe -udp YOUR_TOKEN PORT\n' +
-        'For DNS2TCP: .\\rslvd-tunnel-windows-amd64.exe -dns YOUR_TOKEN PORT'
+        'Remote access (paid plans): .\\rslvd-tunnel-windows-amd64.exe -adb YOUR_TOKEN 5555  →  adb connect rslvd.net:<public-port>'
       )
     ),
 
@@ -3527,7 +3601,7 @@ function LegalWall({ user, onAccepted }) {
 
 // ── Downloads Page ────────────────────────────────────────────────────────────
 function DownloadsPage({ navigate }) {
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
   const BASE = '/dl';
 
   const platforms = [
@@ -3588,7 +3662,7 @@ function DownloadsPage({ navigate }) {
       'rslvd-tunnel v', VERSION, ' — Dynamic DNS + CGNAT tunnel client'
     ),
     React.createElement('p', { style: { color: 'var(--text3)', marginBottom: 32, fontSize: 13 } },
-      'Single binary, no dependencies. Supports TCP, UDP, and DNS2TCP tunneling modes.'
+      'Single binary, no dependencies. Supports TCP, UDP, and premium remote-access modes for SSH and ADB.'
     ),
 
     // Quick install box

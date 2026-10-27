@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base32"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -15,21 +14,18 @@ import (
 )
 
 const (
-	serverHost    = "rslvd.net"
-	
+	serverHost = "rslvd.net"
+
 	// TCP ports
-	tcpControlPort   = "7000"
-	tcpDataPort      = "7001"
-	
+	tcpControlPort = "7000"
+	tcpDataPort    = "7001"
+
 	// UDP ports
-	udpControlPort   = "7100"
-	udpDataPort      = "7101"
-	
-	// DNS2TCP port
-	dns2tcpPort      = "7200"
-	
+	udpControlPort = "7100"
+	udpDataPort    = "7101"
+
 	reconnectWait = 5 * time.Second
-	version       = "1.3.0"
+	version       = "1.4.0"
 )
 
 var deviceNameRe = regexp.MustCompile(`[^A-Za-z0-9._-]`)
@@ -68,10 +64,27 @@ func deviceName() string {
 type TunnelMode string
 
 const (
-	ModeTCP     TunnelMode = "tcp"
-	ModeUDP     TunnelMode = "udp"
-	ModeDNS2TCP TunnelMode = "dns2tcp"
+	ModeTCP TunnelMode = "tcp"
+	ModeUDP TunnelMode = "udp"
+	ModeSSH TunnelMode = "ssh" // premium: raw public port → local SSH daemon
+	ModeADB TunnelMode = "adb" // premium: raw public port → local adb / adbd
 )
+
+// Remote-access modes publish a real TCP port on the server (premium feature).
+func isRemoteMode(m TunnelMode) bool {
+	return m == ModeSSH || m == ModeADB
+}
+
+// defaultLocalPort is used when the user omits the local port argument.
+func defaultLocalPort(m TunnelMode) string {
+	switch m {
+	case ModeSSH:
+		return "22"
+	case ModeADB:
+		return "5555"
+	}
+	return ""
+}
 
 // resolveHost resolves a hostname using the system resolver, falling back to
 // public DNS (8.8.8.8:53) if the system resolver fails.
@@ -108,13 +121,15 @@ func dialServer(host, port string, timeout time.Duration) (net.Conn, error) {
 func usage() {
 	fmt.Fprintf(os.Stderr, "rslvd-tunnel v%s - Multi-protocol tunnel client\n\n", version)
 	fmt.Fprintf(os.Stderr, "Usage:\n")
-	fmt.Fprintf(os.Stderr, "  TCP:     rslvd-tunnel <token> <local_port>\n")
-	fmt.Fprintf(os.Stderr, "  UDP:     rslvd-tunnel -udp <token> <local_port>\n")
-	fmt.Fprintf(os.Stderr, "  DNS2TCP: rslvd-tunnel -dns <token> <local_port>\n\n")
-	fmt.Fprintf(os.Stderr, "Examples:\n")
-	fmt.Fprintf(os.Stderr, "  rslvd-tunnel abc123 8080          # TCP tunnel\n")
-	fmt.Fprintf(os.Stderr, "  rslvd-tunnel -udp abc123 53       # UDP tunnel (DNS)\n")
-	fmt.Fprintf(os.Stderr, "  rslvd-tunnel -dns abc123 22       # DNS2TCP tunnel (SSH over DNS)\n\n")
+	fmt.Fprintf(os.Stderr, "  TCP:  rslvd-tunnel <token> <local_port>\n")
+	fmt.Fprintf(os.Stderr, "  UDP:  rslvd-tunnel -udp <token> <local_port>\n")
+	fmt.Fprintf(os.Stderr, "  SSH:  rslvd-tunnel -ssh <token> [local_port]   (premium, default 22)\n")
+	fmt.Fprintf(os.Stderr, "  ADB:  rslvd-tunnel -adb <token> [local_port]   (premium, default 5555)\n\n")
+	fmt.Fprintf(os.Stderr, "Remote access (SSH/ADB) publishes a real TCP port on rslvd.net, so any\n")
+	fmt.Fprintf(os.Stderr, "SSH or ADB client can reach this machine from anywhere:\n\n")
+	fmt.Fprintf(os.Stderr, "  rslvd-tunnel -ssh abc123 22      # then: ssh -p <port> you@rslvd.net\n")
+	fmt.Fprintf(os.Stderr, "  rslvd-tunnel -adb abc123 5555    # then: adb connect rslvd.net:<port>\n")
+	fmt.Fprintf(os.Stderr, "  rslvd-tunnel -adb abc123 5037    # exposes a PC's adb server instead\n\n")
 	fmt.Fprintf(os.Stderr, "Get your token from: https://rslvd.net/dashboard\n")
 	os.Exit(1)
 }
@@ -142,12 +157,14 @@ func readLine(conn net.Conn, timeout time.Duration) (string, error) {
 	return strings.TrimRight(string(line), "\r"), nil
 }
 
-// ==================== TCP TUNNEL ====================
+// ==================== TCP + REMOTE (SSH / ADB) TUNNELS ====================
 
-func connectTCPControl(token string) (net.Conn, error) {
+// connectTCPControl performs the control handshake. For remote-access tunnels
+// the server answers "OK <public_port>" and that port is returned as publicPort.
+func connectTCPControl(token string) (net.Conn, string, error) {
 	conn, err := dialServer(serverHost, tcpControlPort, 10*time.Second)
 	if err != nil {
-		return nil, fmt.Errorf("cannot reach %s:%s — %w", serverHost, tcpControlPort, err)
+		return nil, "", fmt.Errorf("cannot reach %s:%s — %w", serverHost, tcpControlPort, err)
 	}
 
 	fmt.Fprintf(conn, "HELLO %s %s %s\n", token, deviceID(), deviceName())
@@ -155,19 +172,24 @@ func connectTCPControl(token string) (net.Conn, error) {
 	line, err := readLine(conn, 10*time.Second)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("no response from server: %w", err)
+		return nil, "", fmt.Errorf("no response from server: %w", err)
 	}
 
 	if strings.HasPrefix(line, "ERR ") {
 		conn.Close()
-		return nil, fmt.Errorf("server error: %s", strings.TrimPrefix(line, "ERR "))
+		return nil, "", fmt.Errorf("server error: %s", strings.TrimPrefix(line, "ERR "))
 	}
-	if !strings.HasPrefix(strings.TrimSpace(line), "OK") {
+	fields := strings.Fields(strings.TrimSpace(line))
+	if len(fields) == 0 || fields[0] != "OK" {
 		conn.Close()
-		return nil, fmt.Errorf("unexpected server response: %s", line)
+		return nil, "", fmt.Errorf("unexpected server response: %s", line)
 	}
 
-	return conn, nil
+	publicPort := ""
+	if len(fields) > 1 {
+		publicPort = fields[1]
+	}
+	return conn, publicPort, nil
 }
 
 func handleTCPData(token, localPort string) {
@@ -204,17 +226,52 @@ func handleTCPData(token, localPort string) {
 	}()
 }
 
-func runTCPTunnel(token, localPort string) error {
-	log("Connecting TCP tunnel to rslvd.net...")
-	conn, err := connectTCPControl(token)
+// printRemoteHelp explains how to reach a raw-port tunnel from the outside.
+func printRemoteHelp(mode TunnelMode, publicPort, localPort string) {
+	if publicPort == "" {
+		log("  (server did not report a public port — check your dashboard)")
+		return
+	}
+	switch mode {
+	case ModeSSH:
+		log("  Public:  %s:%s  (raw TCP)", serverHost, publicPort)
+		log("  Connect: ssh -p %s <user>@%s", publicPort, serverHost)
+		log("  Or use your tunnel hostname: ssh -p %s <user>@<name>.%s", publicPort, serverHost)
+	case ModeADB:
+		log("  Public:  %s:%s  (raw TCP)", serverHost, publicPort)
+		if localPort == "5037" {
+			log("  Connect (adb server mode): adb -H %s -P %s devices", serverHost, publicPort)
+			log("  Then use any device by serial, e.g. adb -H %s -P %s shell", serverHost, publicPort)
+		} else {
+			log("  Connect: adb connect %s:%s", serverHost, publicPort)
+			log("  Then:    adb -s %s:%s shell", serverHost, publicPort)
+			log("  Tip: on the device run  adb tcpip %s  first (or enable ADB over network)", localPort)
+		}
+	}
+}
+
+func runTCPTunnel(token, localPort string, mode TunnelMode) error {
+	if isRemoteMode(mode) {
+		log("Connecting remote access (%s) tunnel to rslvd.net...", strings.ToUpper(string(mode)))
+	} else {
+		log("Connecting TCP tunnel to rslvd.net...")
+	}
+
+	conn, publicPort, err := connectTCPControl(token)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	log("✓ TCP Tunnel active!")
-	log("  Local:   localhost:%s", localPort)
-	log("  (Ctrl+C to stop)")
+	if isRemoteMode(mode) {
+		log("✓ %s tunnel active!", strings.ToUpper(string(mode)))
+		log("  Local:   localhost:%s", localPort)
+		printRemoteHelp(mode, publicPort, localPort)
+	} else {
+		log("✓ TCP Tunnel active!")
+		log("  Local:   localhost:%s", localPort)
+		log("  (Ctrl+C to stop)")
+	}
 
 	for {
 		line, err := readLine(conn, 60*time.Second)
@@ -366,257 +423,6 @@ func runUDPTunnel(token, localPort string) error {
 	}
 }
 
-// ==================== DNS2TCP TUNNEL ====================
-//
-// DNS2TCP reverse tunnel protocol:
-//   Client → Server: DNS query with QNAME = <base32data>.<token>.tunnel.rslvd.net
-//   Server → Client: [txId 2B][type 1B][payload...]
-//     type 0x00 = NOOP (no pending data)
-//     type 0x01 = DATA (rest is [connId 2B][tcp data...])
-//     type 0x02 = CONNECT (new public connection [connId 2B])
-//     type 0x03 = CLOSE (public connection closed [connId 2B])
-//
-// Client sends response data with: [connId 2B][payload...] encoded in DNS query
-
-const (
-	dnsNoop    = 0x00
-	dnsData    = 0x01
-	dnsConnect = 0x02
-	dnsClose   = 0x03
-)
-
-// encodeDataToDNS encodes binary data into DNS-safe base32 subdomain
-func encodeDataToDNS(data []byte) string {
-	return base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(data)
-}
-
-// buildDNSQuery builds a DNS query packet with optional data payload
-func buildDNSQuery(token string, txId uint16, data []byte) []byte {
-	// Build query name: [<data>.]<token>.tunnel.rslvd.net
-	var qname string
-	if data != nil && len(data) > 0 {
-		encoded := encodeDataToDNS(data)
-		// Split into 63-char labels (DNS label max length)
-		var labels []string
-		for len(encoded) > 63 {
-			labels = append(labels, encoded[:63])
-			encoded = encoded[63:]
-		}
-		if len(encoded) > 0 {
-			labels = append(labels, encoded)
-		}
-		qname = strings.Join(labels, ".") + "." + token + ".tunnel." + serverHost
-	} else {
-		qname = token + ".tunnel." + serverHost
-	}
-
-	buf := make([]byte, 512)
-
-	// Transaction ID
-	buf[0] = byte(txId >> 8)
-	buf[1] = byte(txId & 0xff)
-
-	// Flags: Standard query
-	buf[2] = 0x01
-	buf[3] = 0x00
-
-	// Questions: 1
-	buf[4] = 0x00
-	buf[5] = 0x01
-
-	// Answer/Authority/Additional RRs: 0
-	buf[6] = 0x00
-	buf[7] = 0x00
-	buf[8] = 0x00
-	buf[9] = 0x00
-	buf[10] = 0x00
-	buf[11] = 0x00
-
-	offset := 12
-
-	// QNAME labels
-	labels := strings.Split(qname, ".")
-	for _, label := range labels {
-		if len(label) > 63 {
-			label = label[:63]
-		}
-		buf[offset] = byte(len(label))
-		offset++
-		copy(buf[offset:], label)
-		offset += len(label)
-	}
-	buf[offset] = 0x00
-	offset++
-
-	// QTYPE: TXT (16)
-	buf[offset] = 0x00
-	buf[offset+1] = 0x10
-	offset += 2
-
-	// QCLASS: IN (1)
-	buf[offset] = 0x00
-	buf[offset+1] = 0x01
-	offset += 2
-
-	return buf[:offset]
-}
-
-func runDNS2TCPTunnel(token, localPort string) error {
-	log("Connecting DNS2TCP tunnel to rslvd.net...")
-	log("Note: DNS2TCP has limited bandwidth (~500 B/poll, latency depends on poll rate)")
-
-	serverIP, err := resolveHost(serverHost)
-	if err != nil {
-		return err
-	}
-
-	// DNS socket
-	dnsConn, err := net.Dial("udp", serverIP+":"+dns2tcpPort)
-	if err != nil {
-		return fmt.Errorf("cannot connect DNS2TCP server: %w", err)
-	}
-	defer dnsConn.Close()
-
-	// Register with initial poll (no data)
-	var txCounter uint16
-	query := buildDNSQuery(token, txCounter, nil)
-	txCounter++
-	dnsConn.Write(query)
-
-	// Wait for response to confirm registration
-	regBuf := make([]byte, 1024)
-	dnsConn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	n, err := dnsConn.Read(regBuf)
-	if err != nil {
-		return fmt.Errorf("registration timeout: %w", err)
-	}
-	if n < 3 {
-		return fmt.Errorf("invalid registration response")
-	}
-	dnsConn.SetReadDeadline(time.Time{})
-
-	log("✓ DNS2TCP Tunnel active!")
-	log("  Local TCP: localhost:%s", localPort)
-	log("  (Polling server for connections...)")
-
-	// Local connections: connId -> net.Conn
-	localConns := make(map[uint16]net.Conn)
-	sendCh := make(chan []byte, 64) // Data to send to server: [connId 2B][payload...]
-
-	// Poll loop — sends queries and processes responses
-	pollInterval := 250 * time.Millisecond
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	// Response reader goroutine
-	go func() {
-		buf := make([]byte, 65535)
-		for {
-			dnsConn.SetReadDeadline(time.Now().Add(5 * time.Second))
-			n, err := dnsConn.Read(buf)
-			if err != nil {
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					continue
-				}
-				log("DNS read error: %v", err)
-				return
-			}
-			if n < 3 {
-				continue
-			}
-
-			// Parse response: [txId 2B][type 1B][payload...]
-			msgType := buf[2]
-			payload := buf[3:n]
-
-			switch msgType {
-			case dnsNoop:
-				// Nothing pending
-
-			case dnsConnect:
-				// New public connection: payload = [connId 2B]
-				if len(payload) < 2 {
-					continue
-				}
-				connId := uint16(payload[0])<<8 | uint16(payload[1])
-				// Connect to local service
-				lc, err := net.DialTimeout("tcp", "localhost:"+localPort, 5*time.Second)
-				if err != nil {
-					log("Cannot connect to localhost:%s for conn %d: %v", localPort, connId, err)
-					continue
-				}
-				localConns[connId] = lc
-				log("  New connection #%d → localhost:%s", connId, localPort)
-
-				// Read from local and queue for sending
-				go func(id uint16, conn net.Conn) {
-					readBuf := make([]byte, 200) // Small chunks for DNS
-					for {
-						rn, err := conn.Read(readBuf)
-						if err != nil {
-							delete(localConns, id)
-							conn.Close()
-							return
-						}
-						// Prepend connId
-						msg := make([]byte, 2+rn)
-						msg[0] = byte(id >> 8)
-						msg[1] = byte(id & 0xff)
-						copy(msg[2:], readBuf[:rn])
-						sendCh <- msg
-					}
-				}(connId, lc)
-
-			case dnsData:
-				// Data from public connection: payload = [connId 2B][data...]
-				if len(payload) < 3 {
-					continue
-				}
-				connId := uint16(payload[0])<<8 | uint16(payload[1])
-				data := payload[2:]
-				if lc, ok := localConns[connId]; ok {
-					lc.Write(data)
-				}
-
-			case dnsClose:
-				// Public connection closed: payload = [connId 2B]
-				if len(payload) < 2 {
-					continue
-				}
-				connId := uint16(payload[0])<<8 | uint16(payload[1])
-				if lc, ok := localConns[connId]; ok {
-					lc.Close()
-					delete(localConns, connId)
-				}
-			}
-		}
-	}()
-
-	// Main loop: poll and send queued data
-	for {
-		select {
-		case <-ticker.C:
-			// Send poll or queued data
-			select {
-			case data := <-sendCh:
-				query := buildDNSQuery(token, txCounter, data)
-				txCounter++
-				dnsConn.Write(query)
-			default:
-				// Empty poll
-				query := buildDNSQuery(token, txCounter, nil)
-				txCounter++
-				dnsConn.Write(query)
-			}
-		case data := <-sendCh:
-			// Data ready to send — send immediately
-			query := buildDNSQuery(token, txCounter, data)
-			txCounter++
-			dnsConn.Write(query)
-		}
-	}
-}
-
 // ==================== MAIN ====================
 
 func main() {
@@ -624,36 +430,42 @@ func main() {
 		fmt.Printf("rslvd-tunnel v%s\n", version)
 		os.Exit(0)
 	}
-	
-	if len(os.Args) < 3 {
-		usage()
-	}
-	
+
 	mode := ModeTCP
-	token := ""
-	localPort := ""
 	argIdx := 1
-	
+
 	// Parse flags
-	if os.Args[argIdx] == "-udp" {
-		mode = ModeUDP
-		argIdx++
-	} else if os.Args[argIdx] == "-dns" || os.Args[argIdx] == "-dns2tcp" {
-		mode = ModeDNS2TCP
+	for argIdx < len(os.Args) && strings.HasPrefix(os.Args[argIdx], "-") {
+		switch os.Args[argIdx] {
+		case "-udp":
+			mode = ModeUDP
+		case "-ssh":
+			mode = ModeSSH
+		case "-adb":
+			mode = ModeADB
+		case "-dns", "-dns2tcp":
+			fmt.Fprintln(os.Stderr, "DNS2TCP tunneling has been removed — use -ssh, -adb, TCP or -udp instead.")
+			os.Exit(1)
+		default:
+			usage()
+		}
 		argIdx++
 	}
-	
-	if len(os.Args) < argIdx+2 {
+
+	if len(os.Args) <= argIdx {
 		usage()
 	}
-	
-	token = os.Args[argIdx]
-	localPort = os.Args[argIdx+1]
-	
+
+	token := os.Args[argIdx]
+	localPort := defaultLocalPort(mode)
+	if len(os.Args) > argIdx+1 {
+		localPort = os.Args[argIdx+1]
+	}
+
 	if token == "" || localPort == "" {
 		usage()
 	}
-	
+
 	log("rslvd-tunnel v%s - Mode: %s", version, mode)
 
 	attempt := 0
@@ -666,14 +478,12 @@ func main() {
 
 		var err error
 		switch mode {
-		case ModeTCP:
-			err = runTCPTunnel(token, localPort)
+		case ModeTCP, ModeSSH, ModeADB:
+			err = runTCPTunnel(token, localPort, mode)
 		case ModeUDP:
 			err = runUDPTunnel(token, localPort)
-		case ModeDNS2TCP:
-			err = runDNS2TCPTunnel(token, localPort)
 		}
-		
+
 		if err != nil {
 			log("Disconnected: %v", err)
 		}

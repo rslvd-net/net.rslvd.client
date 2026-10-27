@@ -71,7 +71,7 @@ fun MainScaffold(vm: AppViewModel) {
         val mod = Modifier.padding(padding)
         when (tab) {
             Tab.Hosts -> HostsScreen(vm, mod)
-            Tab.Tunnels -> TunnelsScreen(vm, mod)
+            Tab.Tunnels -> TunnelsScreen(vm, mod, onUpgrade = { tab = Tab.Billing })
             Tab.Ddns -> DdnsScreen(vm, mod)
             Tab.Billing -> BillingScreen(vm, mod)
             Tab.Terminal -> TerminalScreen(mod)

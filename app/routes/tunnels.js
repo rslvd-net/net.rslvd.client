@@ -6,13 +6,28 @@ const ionos = require('../lib/ionos');
 const activity = require('../lib/activity');
 const dnsAudit = require('../lib/dns-audit');
 const tunnelCert = require('../lib/tunnel-cert');
-const { activeBonus } = require('../lib/plans');
+const { activeBonus, isRemoteProtocol, hasRemoteAccess } = require('../lib/plans');
 const tunnelProxy = require('../lib/tunnel-proxy');
 
 const PORT_MIN = 20000;
 const PORT_MAX = 29999;
 const LABEL_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 const CAN_NEST  = (user) => user.plan === 'annual' || user.is_site_owner;
+
+// tcp/udp ride the HTTP & UDP proxies; ssh/adb are premium raw-port tunnels
+const ALLOWED_PROTOCOLS = ['tcp', 'udp', 'ssh', 'adb'];
+const SERVER_HOST = () => process.env.BASE_DOMAIN || 'rslvd.net';
+
+/** Attach the public endpoint of a remote-access (SSH/ADB) tunnel to an API row. */
+function withRemoteMeta(t) {
+  const remote = isRemoteProtocol(t.protocol);
+  return {
+    ...t,
+    is_remote: remote,
+    remote_host: remote ? SERVER_HOST() : null,
+    remote_port: remote ? t.tunnel_port : null,
+  };
+}
 
 // ── Public: token lookup for rslvd-tunnel client (no auth) ──────────────────
 router.get('/connect/:token', async (req, res) => {
@@ -41,7 +56,24 @@ router.get('/', async (req, res) => {
      FROM tunnels WHERE user_id = $1 ORDER BY parent_tunnel_id NULLS FIRST, created_at DESC`,
     [req.user.id]
   );
-  res.json(result.rows.map((t) => ({ ...t, connected: tunnelProxy.isConnected(t.fqdn) })));
+  res.json(result.rows.map((t) => ({ ...withRemoteMeta(t), connected: tunnelProxy.isConnected(t.fqdn) })));
+});
+
+// ── Remote access (premium SSH / ADB) capability for the dashboard ────────────
+router.get('/remote-access', async (req, res) => {
+  const user = req.user;
+  const eligible = hasRemoteAccess(user);
+  res.json({
+    eligible,
+    upgrade_required: !eligible,
+    host: SERVER_HOST(),
+    port_min: PORT_MIN,
+    port_max: PORT_MAX,
+    protocols: [
+      { key: 'ssh', label: 'SSH', default_port: 22, desc: 'SSH into a machine behind CGNAT or a firewall' },
+      { key: 'adb', label: 'ADB', default_port: 5555, desc: 'adb connect to an Android device anywhere in the world' },
+    ],
+  });
 });
 
 // ── Create tunnel ────────────────────────────────────────────────────────────
@@ -52,6 +84,23 @@ router.post('/', async (req, res) => {
 
     const user = req.user;
     const BASE = process.env.BASE_DOMAIN;
+
+    const protocolKey = String(protocol || 'tcp').toLowerCase();
+    if (!ALLOWED_PROTOCOLS.includes(protocolKey)) {
+      return res.status(400).json({ error: `Unsupported protocol. Use one of: ${ALLOWED_PROTOCOLS.join(', ')}` });
+    }
+    const remote = isRemoteProtocol(protocolKey);
+
+    // ── Premium gate: SSH/ADB over a raw public port ──────────────────────────
+    if (remote && !hasRemoteAccess(user)) {
+      return res.status(403).json({
+        error: 'Remote access (SSH/ADB over a public port) is a premium feature. Upgrade your plan to unlock it.',
+        upgrade_required: true,
+      });
+    }
+    if (remote && parent_id) {
+      return res.status(400).json({ error: 'SSH/ADB tunnels must be top-level — nested subdomains are HTTP only.' });
+    }
 
     // ── Nested tunnel path ───────────────────────────────────────────────────
     if (parent_id) {
@@ -102,7 +151,7 @@ router.post('/', async (req, res) => {
          VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8,$9)
          RETURNING id, name, target_host, target_port, protocol,
                    status, fqdn, token, active, created_at, parent_tunnel_id, force_https`,
-        [user.id, name, target_host, target_port, protocol, fqdn, token, parent_id, wantHttps]
+        [user.id, name, target_host, target_port, protocolKey, fqdn, token, parent_id, wantHttps]
       );
 
       try {
@@ -157,14 +206,21 @@ router.post('/', async (req, res) => {
 
     const token = crypto.randomBytes(2).toString('hex').slice(0, 4);
 
-    const wantHttps = force_https !== false;
+    // Remote-access tunnels own a real public port on the server
+    let remotePort = null;
+    if (remote) {
+      remotePort = await allocatePort();
+      if (!remotePort) return res.status(503).json({ error: 'No free public ports available right now — try again shortly.' });
+    }
+
+    const wantHttps = force_https !== false && !remote;
     const result = await pool.query(
       `INSERT INTO tunnels (user_id, name, target_host, target_port, protocol,
-                            status, fqdn, token, force_https)
-       VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8)
-       RETURNING id, name, target_host, target_port, protocol,
+                            status, fqdn, token, force_https, tunnel_port)
+       VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8,$9)
+       RETURNING id, name, target_host, target_port, protocol, tunnel_port,
                  status, fqdn, token, active, created_at, parent_tunnel_id, force_https`,
-      [user.id, name, target_host, target_port, protocol, fqdn, token, wantHttps]
+      [user.id, name, target_host, target_port, protocolKey, fqdn, token, wantHttps, remotePort]
     );
 
     try {
@@ -175,11 +231,12 @@ router.post('/', async (req, res) => {
       result.rows[0].status = 'active';
     } catch (e) { console.error('DNS for tunnel failed:', e.message); }
 
-    if (!wantHttps) tunnelCert.enableHttpFallback(fqdn);
+    // SSH/ADB tunnels are raw TCP — no HTTPS fallback and no SSL cert needed
+    if (!remote && !wantHttps) tunnelCert.enableHttpFallback(fqdn);
 
-    activity.log('tunnel.create', { userId: user.id, detail: fqdn, req });
+    activity.log('tunnel.create', { userId: user.id, detail: remote ? `${fqdn} (${protocolKey} → ${SERVER_HOST()}:${remotePort})` : fqdn, req });
     dnsAudit.record({ userId: user.id, tunnelId: result.rows[0].id, fqdn, change: 'tunnel_created', req });
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(withRemoteMeta(result.rows[0]));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create tunnel' });
@@ -196,7 +253,7 @@ router.get('/:id', async (req, res) => {
     );
     const t = result.rows[0];
     if (!t) return res.status(404).json({ error: 'Tunnel not found' });
-    res.json(t);
+    res.json(withRemoteMeta(t));
   } catch (err) {
     res.status(500).json({ error: 'Failed to get tunnel' });
   }
@@ -316,7 +373,7 @@ router.post('/:id/regenerate-token', async (req, res) => {
 
 // ── Helper: allocate next free port ──────────────────────────────────────────
 async function allocatePort() {
-  const usedPorts = await pool.query('SELECT tunnel_port FROM tunnels WHERE active = TRUE');
+  const usedPorts = await pool.query('SELECT tunnel_port FROM tunnels WHERE tunnel_port IS NOT NULL');
   const used = new Set(usedPorts.rows.map(r => r.tunnel_port));
   for (let p = PORT_MIN; p <= PORT_MAX; p++) {
     if (!used.has(p)) return p;

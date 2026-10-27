@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="1.3.0"
+VERSION="1.4.0"
 ARCHES=("amd64" "arm64")
 DEB_ARCH_MAP=("amd64:amd64" "arm64:arm64")
 
@@ -34,8 +34,9 @@ Maintainer: rslvd.privatedns.org <support@rslvd.privatedns.org>
 Homepage: https://rslvd.privatedns.org
 Description: Dynamic DNS + CGNAT tunnel client for rslvd.privatedns.org
  A lightweight tunnel client that connects your local services to the
- internet through rslvd.privatedns.org. Supports TCP, UDP, and DNS2TCP tunneling
- modes. Works behind carrier-grade NAT (CGNAT) without port forwarding.
+ internet through rslvd.privatedns.org. Supports TCP and UDP tunneling plus
+ premium remote access (SSH/ADB) on a real public port. Works behind
+ carrier-grade NAT (CGNAT) without port forwarding.
 EOF
 
   # Systemd service template (uses EnvironmentFile for token + port)

@@ -72,6 +72,10 @@ data class Tunnel(
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "parent_tunnel_id") val parentTunnelId: String? = null,
     @Json(name = "force_https") val forceHttps: Boolean = true,
+    // Remote access (premium SSH/ADB raw-port tunnels)
+    @Json(name = "is_remote") val isRemote: Boolean = false,
+    @Json(name = "remote_host") val remoteHost: String? = null,
+    @Json(name = "remote_port") val remotePort: Int? = null,
 )
 
 data class CreateTunnelRequest(

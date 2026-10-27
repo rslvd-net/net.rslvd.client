@@ -16,6 +16,30 @@ const DONATION = {
   maxBonusSlots: 100,
 };
 
+// ── Remote access (premium) ──────────────────────────────────────────────────
+// Raw-port tunnels (SSH, ADB, …) publish a real TCP port on the server so
+// binary protocols work end-to-end. Any paid plan unlocks them.
+const PAID_PLAN_KEYS = ['monthly', 'quarterly', 'semi_annual', 'annual'];
+const REMOTE_PROTOCOLS = ['ssh', 'adb'];
+
+/** Is this tunnel protocol a premium raw-port (SSH/ADB) tunnel? */
+function isRemoteProtocol(protocol) {
+  return REMOTE_PROTOCOLS.includes(String(protocol || '').toLowerCase());
+}
+
+/**
+ * Does this user have remote access (SSH/ADB over a public port)?
+ * True for any active paid plan and for site owners/admins. Accepts either a
+ * request user row or the joined { plan, plan_expires_at, … } shape.
+ */
+function hasRemoteAccess(user) {
+  if (!user) return false;
+  if (user.is_site_owner || user.is_admin || user.role === 'site_owner' || user.role === 'admin') return true;
+  if (!PAID_PLAN_KEYS.includes(user.plan)) return false;
+  if (user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) return false;
+  return true;
+}
+
 /** Currently-active donation bonus slots for a user row (0 when expired). */
 function activeBonus(user) {
   const active = user && user.bonus_expires_at && new Date(user.bonus_expires_at) > new Date();
@@ -26,4 +50,7 @@ function activeBonus(user) {
   };
 }
 
-module.exports = { PLANS, DONATION, activeBonus };
+module.exports = {
+  PLANS, DONATION, activeBonus,
+  PAID_PLAN_KEYS, REMOTE_PROTOCOLS, isRemoteProtocol, hasRemoteAccess,
+};

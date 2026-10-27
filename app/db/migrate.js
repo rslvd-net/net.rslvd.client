@@ -291,6 +291,13 @@ CREATE TABLE IF NOT EXISTS beta_testers (
   name TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Remote access (premium SSH/ADB raw-port tunnels) + DNS2TCP retirement
+ALTER TABLE tunnels ALTER COLUMN tunnel_port DROP NOT NULL;
+ALTER TABLE tunnels ALTER COLUMN protocol TYPE VARCHAR(16);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tunnels_tunnel_port ON tunnels(tunnel_port) WHERE tunnel_port IS NOT NULL;
+-- DNS2TCP is no longer supported: keep the tunnels usable as plain TCP tunnels
+UPDATE tunnels SET protocol = 'tcp' WHERE protocol = 'dns2tcp';
 `;
 
 async function run() {

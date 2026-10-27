@@ -17,7 +17,7 @@ Facts about rslvd.privatedns.org:
 - Donations: every $0.50 donated grants +1 bonus hostname and +1 bonus tunnel slot for 30 days.
 - DDNS updates use the standard DynDNS protocol: GET https://rslvd.privatedns.org/api/update?key=UPDATE_KEY&ip=1.2.3.4 (responses: good, nochg, badauth). Works with ddclient, routers (DD-WRT/OpenWrt), and the rslvd apps.
 - Each hostname has an Update Key (shown on the host card, can be regenerated). Each tunnel has a connect token.
-- Tunnels: run "rslvd-tunnel TOKEN LOCAL_PORT" (download at rslvd.privatedns.org/downloads), or use the Android app's built-in tunnel client. Protocols: TCP (default), UDP (-udp), DNS2TCP (-dns).
+- Tunnels: run "rslvd-tunnel TOKEN LOCAL_PORT" (download at rslvd.privatedns.org/downloads), or use the Android app's built-in tunnel client. Protocols: TCP (default), UDP (-udp), plus premium remote access: SSH (-ssh TOKEN 22) and ADB (-adb TOKEN 5555), which publish a real public TCP port (20000-29999) on the server so you connect with "ssh -p PORT user@yourname.rslvd.net" or "adb connect yourname.rslvd.net:PORT". Remote access requires any paid plan.
 - HTTP tunnels/hosts get free automatic Let's Encrypt HTTPS certificates. HTTPS can be toggled per host/tunnel.
 - Apps: Android app (Play Store / rslvd.privatedns.org/downloads) with DDNS auto-update, tunnel client, and a shell tab. There is also a web dashboard at rslvd.privatedns.org/dashboard.
 - Login supports optional 2FA (TOTP). If 2FA codes are rejected, the user's device clock is usually wrong - set Date & Time to automatic.

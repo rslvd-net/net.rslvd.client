@@ -42,14 +42,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.rslvd.client.data.Tunnel
+import net.rslvd.client.tunnel.TunnelClient
 import net.rslvd.client.tunnel.TunnelService
 
 @Composable
-fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
+fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier, onUpgrade: (() -> Unit)? = null) {
     val state by vm.tunnels.collectAsState()
     val tunnelStates by TunnelService.states.collectAsState()
+    val user by vm.user.collectAsState()
     var showAdd by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<Tunnel?>(null) }
+    var showPremiumDialog by remember { mutableStateOf(false) }
+
+    // Remote access (SSH/ADB) is a premium feature — any paid plan unlocks it
+    val hasRemoteAccess = user?.let {
+        it.isSiteOwner || it.role == "site_owner" || it.role == "admin" ||
+            (it.plan != null && it.plan != "free" && it.status != "free" && it.status != "inactive")
+    } ?: false
 
     val requestNotifications = rememberNotificationPermissionRequest()
 
@@ -85,10 +94,21 @@ fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                             status = status,
                             onCopyToken = {
                                 val proto = t.protocol ?: "tcp"
-                                val flag = when (proto) { "udp" -> "-udp "; "dns2tcp" -> "-dns "; else -> "" }
+                                val flag = when (proto) { "udp" -> "-udp "; "ssh" -> "-ssh "; "adb" -> "-adb "; else -> "" }
                                 val cmd = "rslvd-tunnel $flag${t.token} ${t.targetPort ?: ""}".trim()
-                                val url = t.fqdn?.let { f -> "${if (t.forceHttps) "https" else "http"}://$f" } ?: ""
-                                vm.copyText("token + URL", listOf(url, cmd).filter { it.isNotBlank() }.joinToString("\n"), sensitive = true)
+                                val lines = mutableListOf<String>()
+                                if (TunnelClient.isRemoteProtocol(proto)) {
+                                    val endpoint = remoteEndpoint(t)
+                                    lines += "Endpoint: $endpoint"
+                                    lines += cmd
+                                    lines += if (proto == "ssh") "ssh -p ${t.remotePort ?: "<port>"} <user>@rslvd.net"
+                                    else if (t.targetPort == 5037) "adb -H rslvd.net -P ${t.remotePort ?: "<port>"} devices"
+                                    else "adb connect $endpoint"
+                                } else {
+                                    t.fqdn?.let { f -> lines += "${if (t.forceHttps) "https" else "http"}://$f" }
+                                    lines += cmd
+                                }
+                                vm.copyText("token + endpoint", lines.filter { it.isNotBlank() }.joinToString("\n"), sensitive = true)
                             },
                             onConnect = { requestNotifications(); vm.connectTunnel(t) },
                             onDisconnect = { vm.disconnectTunnel(t) },
@@ -102,10 +122,33 @@ fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 
     if (showAdd) {
         AddTunnelDialog(
+            hasRemoteAccess = hasRemoteAccess,
+            onPremiumBlocked = { showPremiumDialog = true },
             onDismiss = { showAdd = false },
             onConfirm = { name, port, host, proto, https ->
                 vm.createTunnel(name, port, host, proto, https) { ok -> if (ok) showAdd = false }
             },
+        )
+    }
+
+    if (showPremiumDialog) {
+        AlertDialog(
+            onDismissRequest = { showPremiumDialog = false },
+            title = { Text("\uD83D\uDEE0 Premium feature") },
+            text = {
+                Text(
+                    "SSH and ADB tunnels publish a real public TCP port on rslvd.net, so you can run " +
+                        "\"ssh -p <port> user@rslvd.net\" or \"adb connect rslvd.net:<port>\" from anywhere — " +
+                        "no port forwarding, no VPN. Every paid plan includes them."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPremiumDialog = false
+                    onUpgrade?.invoke()
+                }) { Text("See plans") }
+            },
+            dismissButton = { TextButton(onClick = { showPremiumDialog = false }) { Text("Not now") } },
         )
     }
 
@@ -139,7 +182,10 @@ private fun TunnelCard(
                 IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
             }
             Text(
-                "${tunnel.protocol?.uppercase() ?: "TCP"} → ${tunnel.targetHost ?: "localhost"}:${tunnel.targetPort ?: "?"}  ·  $statusLabel",
+                if (TunnelClient.isRemoteProtocol(tunnel.protocol))
+                    "${tunnel.protocol?.uppercase()} → ${tunnel.targetHost ?: "localhost"}:${tunnel.targetPort ?: "?"}  ·  ${remoteEndpoint(tunnel)}  ·  $statusLabel"
+                else
+                    "${tunnel.protocol?.uppercase() ?: "TCP"} → ${tunnel.targetHost ?: "localhost"}:${tunnel.targetPort ?: "?"}  ·  $statusLabel",
                 fontSize = 13.sp,
                 color = if (agentAttached) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -163,8 +209,17 @@ private fun TunnelCard(
     }
 }
 
+/** "host:port" of the public endpoint for a remote-access tunnel. */
+private fun remoteEndpoint(t: Tunnel): String {
+    val host = t.remoteHost ?: "rslvd.net"
+    val port = t.remotePort ?: t.tunnelPort
+    return if (port != null) "$host:$port" else "$host:<port>"
+}
+
 @Composable
 private fun AddTunnelDialog(
+    hasRemoteAccess: Boolean,
+    onPremiumBlocked: () -> Unit,
     onDismiss: () -> Unit,
     onConfirm: (String, Int, String, String, Boolean) -> Unit,
 ) {
@@ -173,6 +228,7 @@ private fun AddTunnelDialog(
     var host by remember { mutableStateOf("localhost") }
     var proto by remember { mutableStateOf("tcp") }
     var https by remember { mutableStateOf(true) }
+    val remote = TunnelClient.isRemoteProtocol(proto)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -186,14 +242,37 @@ private fun AddTunnelDialog(
                 LabeledField(port, { port = it.filter { c -> c.isDigit() }.take(5) }, "target port")
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("tcp", "udp", "dns2tcp").forEach { p ->
-                        FilterChip(selected = proto == p, onClick = { proto = p }, label = { Text(p) })
+                    listOf("tcp", "udp", "ssh", "adb").forEach { p ->
+                        val premium = TunnelClient.isRemoteProtocol(p)
+                        FilterChip(
+                            selected = proto == p,
+                            onClick = {
+                                if (premium && !hasRemoteAccess) { onPremiumBlocked(); return@FilterChip }
+                                proto = p
+                                if (p == "ssh" && port.isBlank()) port = "22"
+                                if (p == "adb" && port.isBlank()) port = "5555"
+                            },
+                            label = { Text(if (premium && !hasRemoteAccess) "$p \uD83D\uDD12" else p) },
+                        )
                     }
                 }
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Force HTTPS", modifier = Modifier.weight(1f))
-                    Switch(checked = https, onCheckedChange = { https = it })
+                if (remote) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (proto == "ssh")
+                            "Publishes rslvd.net:<port> to your SSH daemon — connect with ssh -p <port> <user>@rslvd.net"
+                        else
+                            "Publishes rslvd.net:<port> to adb (5555 for a device, 5037 for a PC's adb server) — connect with adb connect rslvd.net:<port>",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    )
+                }
+                if (!remote) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Force HTTPS", modifier = Modifier.weight(1f))
+                        Switch(checked = https, onCheckedChange = { https = it })
+                    }
                 }
             }
         },

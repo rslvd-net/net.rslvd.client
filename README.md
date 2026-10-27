@@ -48,6 +48,8 @@ Check it out: https://rslvd.privatedns.org/
 
 - **🌐 Dynamic DNS** - Automatic IP updates via HTTP API, compatible with any DynDNS client
 - **🚇 CGNAT Tunnels** - TCP tunnels that work behind carrier-grade NAT without port forwarding
+- **🛰️ Remote Access (premium)** - SSH and ADB tunnels that publish a real TCP port (20000-29999) on the server, so `ssh -p PORT user@name.rslvd.net` and `adb connect name.rslvd.net:PORT` work from anywhere. Requires any paid plan
+- **📡 UDP Tunnels** - DNS, VoIP, and game servers
 - **🔒 Free SSL Certificates** - Automatic Let's Encrypt integration
 - **💳 Subscription Billing** - Square integration with multiple pricing tiers
 - **📱 Multi-Platform** - Tunnel client binaries for Linux, macOS, Windows, Android (Termux), and routers
@@ -60,7 +62,7 @@ Check it out: https://rslvd.privatedns.org/
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
-│   Router    │────▶│  example.com  │────▶│  IONOS DNS API  │
+│   Router    │────▶│  rslvd.app  │────▶│  IONOS DNS API  │
 │  (DDNS)     │     │   (Node.js) │     │                 │
 └─────────────┘     └─────────────┘     └─────────────────┘
                            │
@@ -310,7 +312,7 @@ ssh user@server 'cd /tmp/rslvd-app && sudo ./deploy.sh'
 
 ```bash
 # Quick update (frontend only)
-scp app/public/app.js rslvd@server:/opt/rslvd/public/
+scp app/public/app2.js rslvd@server:/opt/rslvd/public/
 ssh rslvd@server 'sudo systemctl restart rslvd'
 
 # Full update
@@ -396,16 +398,38 @@ POST /api/hosts/:id/regenerate-key
 ### Tunnels
 
 ```bash
-# List tunnels
+# List tunnels (remote-access rows include is_remote, remote_host, remote_port)
 GET /api/tunnels
 
-# Create tunnel
+# Create tunnel — protocol: tcp | udp | ssh | adb
 POST /api/tunnels
 { "name": "mytunnel", "target_port": 8080 }
+{ "name": "myserver", "target_port": 22, "protocol": "ssh" }   # premium
+{ "name": "myphone",  "target_port": 5555, "protocol": "adb" } # premium
+
+# Remote-access availability for the current plan
+GET /api/tunnels/remote-access
 
 # Delete tunnel
 DELETE /api/tunnels/:id
 ```
+
+**Remote access (premium).** `ssh` and `adb` tunnels get a real public port on the
+server (`tunnel_port`, 20000-29999) wired straight through to the client's local
+port — no HTTP, no TLS termination, so binary protocols work end to end:
+
+```bash
+rslvd-tunnel -ssh TOKEN 22      # exposes local SSH
+rslvd-tunnel -adb TOKEN 5555    # exposes a device's adbd (adb tcpip 5555)
+rslvd-tunnel -adb TOKEN 5037    # exposes a PC's adb server
+
+ssh -p <public_port> user@rslvd.net
+adb connect rslvd.net:<public_port>
+```
+
+Any active paid plan or a site-owner/admin account unlocks remote access; free plans
+see a locked preview with an upgrade CTA. The proxy enforces the plan at handshake
+time as well as in the API.
 
 ### Billing
 
@@ -780,11 +804,14 @@ Plans are defined in `app/lib/plans.js` and charged via the Square Payments API:
 
 | Plan | Price | Hosts | Tunnels |
 |------|-------|-------|---------|
-| Free | $0 | 1 | 1 |
-| Monthly | $0.99/mo | 3 | 3 |
-| Quarterly | $1.99/3mo | 5 | 5 |
-| Semi-Annual | $4.99/6mo | 10 | 10 |
-| Annual | $8.99/yr | 25 | 25 |
+| Free | $0 | 2 | 2 |
+| Monthly | $0.99/mo | 4 | 4 |
+| Quarterly | $1.99/3mo | 12 | 12 |
+| Semi-Annual | $4.99/6mo | 24 | 24 |
+| Annual | $8.99/yr | Unlimited | Unlimited |
+
+Remote access (SSH/ADB raw-port tunnels) is a premium feature: it is included in
+every paid plan above and is not available on the free tier.
 
 ### Site Owner Account
 
@@ -829,7 +856,7 @@ ssh user@server 'cd /tmp/rslvd-app && sudo ./deploy.sh'
 
 ```bash
 # Quick update (frontend only)
-scp app/public/app.js rslvd@server:/opt/rslvd/public/
+scp app/public/app2.js rslvd@server:/opt/rslvd/public/
 ssh rslvd@server 'sudo systemctl restart rslvd'
 
 # Full update
@@ -915,16 +942,38 @@ POST /api/hosts/:id/regenerate-key
 ### Tunnels
 
 ```bash
-# List tunnels
+# List tunnels (remote-access rows include is_remote, remote_host, remote_port)
 GET /api/tunnels
 
-# Create tunnel
+# Create tunnel — protocol: tcp | udp | ssh | adb
 POST /api/tunnels
 { "name": "mytunnel", "target_port": 8080 }
+{ "name": "myserver", "target_port": 22, "protocol": "ssh" }   # premium
+{ "name": "myphone",  "target_port": 5555, "protocol": "adb" } # premium
+
+# Remote-access availability for the current plan
+GET /api/tunnels/remote-access
 
 # Delete tunnel
 DELETE /api/tunnels/:id
 ```
+
+**Remote access (premium).** `ssh` and `adb` tunnels get a real public port on the
+server (`tunnel_port`, 20000-29999) wired straight through to the client's local
+port — no HTTP, no TLS termination, so binary protocols work end to end:
+
+```bash
+rslvd-tunnel -ssh TOKEN 22      # exposes local SSH
+rslvd-tunnel -adb TOKEN 5555    # exposes a device's adbd (adb tcpip 5555)
+rslvd-tunnel -adb TOKEN 5037    # exposes a PC's adb server
+
+ssh -p <public_port> user@rslvd.net
+adb connect rslvd.net:<public_port>
+```
+
+Any active paid plan or a site-owner/admin account unlocks remote access; free plans
+see a locked preview with an upgrade CTA. The proxy enforces the plan at handshake
+time as well as in the API.
 
 ### Billing
 

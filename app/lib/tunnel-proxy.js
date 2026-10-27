@@ -1,7 +1,7 @@
 /**
  * rslvd Multi-Protocol Tunnel Proxy
  *
- * Supports TCP, UDP, and DNS2TCP tunnels
+ * Supports TCP, UDP, and raw remote-access (SSH/ADB) tunnels
  *
  * TCP Tunnels (ports 7000/7001):
  *   Control port 7000: tunnel clients connect, send "HELLO <token>\n"
@@ -13,31 +13,17 @@
  *   Data port 7101: UDP packet relay between public and client
  *   Public UDP port 8081: receives UDP packets, routes by source address
  *
- * DNS2TCP (port 7200):
- *   DNS server on port 7200 (UDP/TCP)
- *   Encodes TCP data in DNS TXT queries/responses
- *   Bypasses captive portals and restrictive firewalls
+ * Remote Access Tunnels (premium — SSH, ADB):
+ *   The tunnel's public TCP port (tunnel_port, 20000-29999) is bound directly
+ *   on the server. Inbound bytes are piped to the client over the same
+ *   7000/7001 control+data channel used by TCP tunnels, so binary protocols
+ *   like SSH (port 22) and ADB (port 5555) work end-to-end.
  */
 
 const net  = require('net');
 const dgram = require('dgram');
 const pool = require('../db/pool');
-
-// Base32hex (RFC 4648) decoder — matches Go's base32.HexEncoding used by the tunnel client
-const B32HEX = '0123456789ABCDEFGHIJKLMNOPQRSTUV';
-function decodeBase32Hex(str) {
-  str = str.replace(/=+$/, '').toUpperCase();
-  const out = [];
-  let bits = 0, value = 0;
-  for (const ch of str) {
-    const idx = B32HEX.indexOf(ch);
-    if (idx === -1) continue;
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) { bits -= 8; out.push((value >>> bits) & 0xff); }
-  }
-  return Buffer.from(out);
-}
+const { hasRemoteAccess } = require('./plans');
 
 // TCP Tunnel ports
 const TCP_CONTROL_PORT = 7000;
@@ -48,13 +34,21 @@ const TCP_PUBLIC_PORT  = 8080;
 const UDP_CONTROL_PORT = 7100;
 const UDP_DATA_PORT    = 7101;
 
-// DNS2TCP port
-const DNS2TCP_PORT = 7200;
+// Remote-access (raw port) tunnels
+const RAW_PROTOCOLS = new Set(['ssh', 'adb', 'raw']);
+const PORT_MIN = 20000;
+const PORT_MAX = 29999;
 
 // fqdn → { token, protocol, controlConn, pendingDataConns: [], udpClientAddr }
 const clients = new Map();
 // token → fqdn (reverse index)
 const tokenToFqdn = new Map();
+// fqdn → net.Server bound on the tunnel's public port (remote-access tunnels only)
+const rawListeners = new Map();
+
+function isRawProtocol(protocol) {
+  return RAW_PROTOCOLS.has(String(protocol || '').toLowerCase());
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -169,7 +163,10 @@ const tcpControlServer = net.createServer(async (conn) => {
   let row;
   try {
     const result = await pool.query(
-      'SELECT id, fqdn, protocol, status, device_lock, bound_device FROM tunnels WHERE token = $1 AND active = TRUE',
+      `SELECT t.id, t.fqdn, t.protocol, t.status, t.device_lock, t.bound_device, t.tunnel_port,
+              u.plan, u.plan_expires_at, u.is_site_owner, u.is_admin
+       FROM tunnels t LEFT JOIN users u ON t.user_id = u.id
+       WHERE t.token = $1 AND t.active = TRUE`,
       [token]
     );
     row = result.rows[0];
@@ -183,6 +180,34 @@ const tcpControlServer = net.createServer(async (conn) => {
     sendLine(conn, 'ERR invalid token');
     conn.destroy();
     return;
+  }
+
+  const isRemoteAccess = isRawProtocol(row.protocol);
+
+  // Remote-access tunnels (SSH/ADB) are a premium feature
+  if (isRemoteAccess && !hasRemoteAccess(row)) {
+    sendLine(conn, 'ERR remote access (SSH/ADB) requires a paid plan — upgrade at rslvd.net/pricing');
+    conn.destroy();
+    return;
+  }
+
+  // Claim a public port for remote tunnels that don't have one yet
+  let remotePort = row.tunnel_port;
+  if (isRemoteAccess) {
+    if (!remotePort) {
+      remotePort = await allocateRemotePort();
+      if (!remotePort) {
+        sendLine(conn, 'ERR no free public ports on server');
+        conn.destroy();
+        return;
+      }
+      try {
+        await pool.query('UPDATE tunnels SET tunnel_port = $1 WHERE id = $2', [remotePort, row.id]);
+      } catch (e) {
+        console.error('[tunnel-proxy] port assignment failed:', e.message);
+      }
+    }
+    log(`Remote ${row.protocol} tunnel: ${row.fqdn} on public port ${remotePort}`);
   }
 
   try {
@@ -208,12 +233,15 @@ const tcpControlServer = net.createServer(async (conn) => {
     tokenToFqdn.delete(existing.token);
   }
 
-  clients.set(fqdn, { token, protocol, controlConn: conn, pendingDataConns: [], udpClientAddr: null });
+  const entry = { token, protocol, controlConn: conn, pendingDataConns: [], udpClientAddr: null };
+  clients.set(fqdn, entry);
   tokenToFqdn.set(token, fqdn);
 
+  if (isRemoteAccess) startRawListener(fqdn, entry, remotePort);
+
   pool.query('UPDATE tunnels SET status = $1 WHERE token = $2', ['active', token]).catch(() => {});
-  sendLine(conn, 'OK');
-  log(`TCP Tunnel registered: ${fqdn} (${protocol})`);
+  sendLine(conn, isRemoteAccess ? `OK ${remotePort}` : 'OK');
+  log(`TCP Tunnel registered: ${fqdn} (${protocol}${isRemoteAccess ? `, public port ${remotePort}` : ''})`);
 
   // Keepalive
   let pingBuf = Buffer.alloc(0);
@@ -229,11 +257,12 @@ const tcpControlServer = net.createServer(async (conn) => {
 
   conn.on('close', () => {
     log(`TCP Control disconnect: ${fqdn}`);
-    const entry = clients.get(fqdn);
-    if (entry && entry.controlConn === conn) {
-      for (const pc of entry.pendingDataConns) { try { pc.destroy(); } catch (_) {} }
+    const live = clients.get(fqdn);
+    if (live && live.controlConn === conn) {
+      for (const pc of live.pendingDataConns) { try { pc.destroy(); } catch (_) {} }
       clients.delete(fqdn);
       tokenToFqdn.delete(token);
+      if (isRemoteAccess) stopRawListener(fqdn);
       pool.query('UPDATE tunnels SET status = $1 WHERE token = $2', ['inactive', token]).catch(() => {});
     }
   });
@@ -285,6 +314,64 @@ const tcpDataServer = net.createServer(async (dataConn) => {
   dataConn.on('error',   () => { try { publicConn.destroy(); } catch (_) {} });
 });
 
+// ── Remote-Access Tunnels (SSH / ADB) ─────────────────────────────────────────
+// Premium tunnels own a real public TCP port on this host. Each inbound
+// connection is handed to the client through the normal CONNECT/DATA dance.
+
+/** First free public port in the remote-access range, or null when exhausted. */
+async function allocateRemotePort() {
+  const usedPorts = new Set();
+  try {
+    const used = await pool.query('SELECT tunnel_port FROM tunnels WHERE tunnel_port IS NOT NULL');
+    for (const r of used.rows) usedPorts.add(r.tunnel_port);
+  } catch (e) {
+    log(`Port lookup failed: ${e.message}`);
+  }
+  for (let p = PORT_MIN; p <= PORT_MAX; p++) {
+    if (!usedPorts.has(p)) return p;
+  }
+  return null;
+}
+
+/** Bind the public port for a remote tunnel; each connection → CONNECT + data channel. */
+function startRawListener(fqdn, entry, port) {
+  stopRawListener(fqdn);
+
+  const server = net.createServer((publicConn) => {
+    const live = clients.get(fqdn);
+    if (!live || live.controlConn !== entry.controlConn) {
+      publicConn.destroy();
+      return;
+    }
+
+    publicConn.setKeepAlive(true, 30000);
+    publicConn.pause();
+    sendLine(live.controlConn, 'CONNECT');
+    live.pendingDataConns.push({ publicConn, headBytes: null });
+
+    setTimeout(() => {
+      const idx = live.pendingDataConns.findIndex((p) => p.publicConn === publicConn);
+      if (idx !== -1) {
+        live.pendingDataConns.splice(idx, 1);
+        try { publicConn.destroy(); } catch (_) {}
+      }
+    }, 10000);
+  });
+
+  server.on('error', (err) => log(`Remote listener ${fqdn}:${port} error: ${err.message}`));
+  server.listen(port, '0.0.0.0', () => {
+    log(`Remote ${entry.protocol.toUpperCase()} tunnel ready: ${fqdn} → rslvd.net:${port}`);
+  });
+  rawListeners.set(fqdn, server);
+}
+
+function stopRawListener(fqdn) {
+  const server = rawListeners.get(fqdn);
+  if (!server) return;
+  rawListeners.delete(fqdn);
+  try { server.close(); } catch (_) {}
+}
+
 // ── TCP Public HTTP/WS Proxy (port 8080) ──────────────────────────────────────
 
 const tcpPublicServer = net.createServer(async (publicConn) => {
@@ -316,13 +403,17 @@ const tcpPublicServer = net.createServer(async (publicConn) => {
     fqdn = m[1].trim().toLowerCase();
 
     const entry = clients.get(fqdn);
-    if (!entry) {
+    // SSH/ADB tunnels own a raw public port — they are not reachable over HTTP
+    if (!entry || entry.protocol !== 'tcp') {
       publicConn.resume();
+      const why = entry
+        ? `${fqdn} is a ${entry.protocol.toUpperCase()} (remote access) tunnel — connect to the port shown in your dashboard instead of HTTP.\n`
+        : `No tunnel is connected for ${fqdn}\n`;
       publicConn.write(
         'HTTP/1.1 502 No Tunnel\r\n' +
         'Content-Type: text/plain\r\n' +
         'Connection: close\r\n\r\n' +
-        `No tunnel is connected for ${fqdn}\n`
+        why
       );
       publicConn.end();
       return;
@@ -510,193 +601,6 @@ udpDataSocket.on('message', (msg, rinfo) => {
 
 udpDataSocket.on('error', (err) => log(`UDP Data error: ${err.message}`));
 
-// ── DNS2TCP Server (port 7200) ─────────────────────────────────────────────────
-//
-// DNS2TCP is a reverse tunnel that transports data inside DNS queries/responses.
-// Useful when the client is behind a firewall that only allows DNS traffic.
-//
-// Protocol:
-//   Client → Server: DNS query with QNAME = <base32data>.<token>.tunnel.rslvd.privatedns.org
-//   Server → Client: Raw response prefixed with type byte:
-//     0x00 = NOOP (no pending data)
-//     0x01 = DATA follows (rest of packet is TCP data from public connection)
-//     0x02 = CONNECT (new public connection arrived)
-//     0x03 = CLOSE (public connection closed)
-//
-// Flow:
-//   1. Client sends HELLO query (no data) to register
-//   2. Server creates public TCP listener on tunnel_port
-//   3. Public connection arrives → server buffers data, signals client on next poll
-//   4. Client polls (empty queries) → server responds with buffered data
-//   5. Client forwards data to local service, sends response back via DNS query
-//   6. Server forwards response to public connection
-
-const dns2tcpSocket = dgram.createSocket('udp4');
-
-// token -> { clientAddr, tunnelPort, fqdn, publicListener, connections: Map<connId, {socket, recvBuf, sendBuf}> }
-const dns2tcpSessions = new Map();
-
-// Response type bytes
-const DNS_NOOP    = 0x00;
-const DNS_DATA    = 0x01;
-const DNS_CONNECT = 0x02;
-const DNS_CLOSE   = 0x03;
-
-function parseDNSQuery(msg) {
-  try {
-    if (msg.length < 12) return null;
-    // Extract transaction ID for response
-    const txId = msg.readUInt16BE(0);
-
-    // Parse QNAME labels
-    let offset = 12;
-    const labels = [];
-    while (offset < msg.length) {
-      const len = msg[offset];
-      if (len === 0) break;
-      if (len > 63) return null;
-      labels.push(msg.slice(offset + 1, offset + 1 + len).toString('ascii'));
-      offset += 1 + len;
-    }
-
-    // Find 'tunnel' marker in labels
-    const tunnelIdx = labels.indexOf('tunnel');
-    if (tunnelIdx < 1) return null;
-
-    const token = labels[tunnelIdx - 1];
-    // Data labels are everything before the token
-    let data = null;
-    if (tunnelIdx > 1) {
-      const dataStr = labels.slice(0, tunnelIdx - 1).join('');
-      data = decodeBase32Hex(dataStr);
-    }
-
-    return { token, data, txId };
-  } catch (e) {
-    return null;
-  }
-}
-
-function buildDNSResponse(txId, typeByte, payload) {
-  // Build a minimal response: txId + type byte + payload
-  // We use a simplified non-DNS format since the client knows to expect our protocol
-  const header = Buffer.alloc(3);
-  header.writeUInt16BE(txId, 0);
-  header[2] = typeByte;
-  if (payload && payload.length > 0) {
-    return Buffer.concat([header, payload]);
-  }
-  return header;
-}
-
-dns2tcpSocket.on('message', async (msg, rinfo) => {
-  const query = parseDNSQuery(msg);
-  if (!query) return;
-
-  const { token, data, txId } = query;
-  let session = dns2tcpSessions.get(token);
-
-  if (!session) {
-    // New session registration — validate token
-    let row;
-    try {
-      const result = await pool.query(
-        'SELECT id, fqdn, tunnel_port, device_lock FROM tunnels WHERE token = $1 AND active = TRUE',
-        [token]
-      );
-      row = result.rows[0];
-    } catch (e) {
-      return;
-    }
-    if (!row) return;
-    // DNS2TCP queries can't carry a device fingerprint — locked tunnels must use TCP/UDP
-    if (row.device_lock) {
-      log(`DNS2TCP registration refused for ${row.fqdn}: device lock enabled`);
-      return;
-    }
-
-    const fqdn = row.fqdn;
-    const tunnelPort = row.tunnel_port;
-
-    // Create session
-    session = {
-      clientAddr: rinfo,
-      tunnelPort,
-      fqdn,
-      publicListener: null,
-      connections: new Map(),
-      nextConnId: 1,
-      outQueue: []  // Queued messages to send to client: { type, connId, data }
-    };
-    dns2tcpSessions.set(token, session);
-    tokenToFqdn.set(token, fqdn);
-    clients.set(fqdn, { token, protocol: 'dns2tcp', controlConn: null, pendingDataConns: [] });
-
-    pool.query('UPDATE tunnels SET status = $1 WHERE token = $2', ['active', token]).catch(() => {});
-    log(`DNS2TCP Tunnel registered: ${fqdn} on port ${tunnelPort}`);
-
-    // Start public TCP listener on tunnel_port
-    const pubServer = net.createServer((pubConn) => {
-      const connId = session.nextConnId++;
-      session.connections.set(connId, { socket: pubConn, recvBuf: Buffer.alloc(0) });
-
-      // Signal client: new connection
-      session.outQueue.push({ type: DNS_CONNECT, connId, data: Buffer.alloc(0) });
-
-      pubConn.on('data', (chunk) => {
-        // Queue data for delivery to client on next poll
-        session.outQueue.push({ type: DNS_DATA, connId, data: chunk });
-      });
-
-      pubConn.on('close', () => {
-        session.connections.delete(connId);
-        session.outQueue.push({ type: DNS_CLOSE, connId, data: Buffer.alloc(0) });
-      });
-
-      pubConn.on('error', () => {
-        session.connections.delete(connId);
-      });
-    });
-
-    pubServer.listen(tunnelPort, '0.0.0.0', () => {
-      log(`DNS2TCP public listener on :${tunnelPort} for ${fqdn}`);
-    });
-    pubServer.on('error', (err) => log(`DNS2TCP public listener error: ${err.message}`));
-    session.publicListener = pubServer;
-  }
-
-  // Update client address (may change between polls)
-  session.clientAddr = rinfo;
-
-  if (data && data.length > 0) {
-    // Client is sending data back — first 2 bytes are connId, rest is payload
-    if (data.length >= 3) {
-      const connId = data.readUInt16BE(0);
-      const payload = data.slice(2);
-      const conn = session.connections.get(connId);
-      if (conn && conn.socket.writable) {
-        conn.socket.write(payload);
-      }
-    }
-  }
-
-  // Respond with next queued message (or NOOP if nothing pending)
-  if (session.outQueue.length > 0) {
-    const item = session.outQueue.shift();
-    // Response format: [txId 2B][type 1B][connId 2B][payload...]
-    const connIdBuf = Buffer.alloc(2);
-    connIdBuf.writeUInt16BE(item.connId, 0);
-    const payload = Buffer.concat([connIdBuf, item.data]);
-    const response = buildDNSResponse(txId, item.type, payload);
-    dns2tcpSocket.send(response, rinfo.port, rinfo.address);
-  } else {
-    const response = buildDNSResponse(txId, DNS_NOOP, null);
-    dns2tcpSocket.send(response, rinfo.port, rinfo.address);
-  }
-});
-
-dns2tcpSocket.on('error', (err) => log(`DNS2TCP error: ${err.message}`));
-
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 function startTunnelProxy() {
@@ -719,10 +623,6 @@ function startTunnelProxy() {
     log(`UDP Data server listening on :${UDP_DATA_PORT}`);
   });
   
-  // DNS2TCP server
-  dns2tcpSocket.bind(DNS2TCP_PORT, '0.0.0.0', () => {
-    log(`DNS2TCP server listening on :${DNS2TCP_PORT}`);
-  });
   
   // Error handlers
   tcpControlServer.on('error', (e) => log(`TCP Control server error: ${e.message}`));
@@ -732,11 +632,7 @@ function startTunnelProxy() {
 
 // Live check: is a tunnel agent currently attached for this fqdn?
 function isConnected(fqdn) {
-  if (clients.has(fqdn)) return true;
-  for (const s of dns2tcpSessions.values()) {
-    if (s.fqdn === fqdn) return true;
-  }
-  return false;
+  return clients.has(fqdn);
 }
 
 module.exports = { startTunnelProxy, isConnected };
