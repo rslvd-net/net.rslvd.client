@@ -47,8 +47,8 @@ async function executeIntent(intent, note) {
 }
 
 /**
- * Apply a paid donation intent: extend the donor window pro-rata to the amount
- * ($22.50 = 30 days) and record the lifetime total.
+ * Apply a paid donation intent: extend the donor window by a flat 3 months
+ * (any amount) and record the lifetime total.
  */
 async function applyDonation(intent, payment) {
   const { rows } = await pool.query('SELECT bonus_expires_at FROM users WHERE id = $1', [intent.user_id]);
@@ -57,7 +57,7 @@ async function applyDonation(intent, payment) {
   const now = new Date();
   const current = rows[0].bonus_expires_at ? new Date(rows[0].bonus_expires_at) : null;
   const base = current && current > now ? current : now;
-  const expires = new Date(base.getTime() + donationDays(intent.amount_cents) * 86400000);
+  const expires = new Date(base.getTime() + donationDays() * 86400000);
 
   await pool.query(
     `UPDATE users SET bonus_expires_at = $1,

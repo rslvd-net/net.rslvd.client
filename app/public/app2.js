@@ -144,7 +144,7 @@ function DonationGoal({ navigate }) {
       )
     ),
     React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, marginTop: 16 } },
-      '$22.50 = 30 days of donor access: unlimited hostnames & tunnels, SSH & ADB tunnels, and nested subdomains & tunnels.'
+      'Any donation = 3 months of donor access (minimum $1): unlimited hostnames & tunnels, SSH & ADB tunnels, and nested subdomains & tunnels.'
     ),
     React.createElement('div', { style: { display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20 } },
       React.createElement('button', { className: 'btn btn-primary btn-lg', onClick: () => navigate('/register') }, 'Create account & donate →'),
@@ -1517,7 +1517,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
   const handleDonate = async () => {
     if (!sqCardRef.current) return;
     const cents = Math.round(parseFloat(donateAmount) * 100);
-    if (!Number.isFinite(cents) || cents < 50) { alert('Minimum donation is $0.50'); return; }
+    if (!Number.isFinite(cents) || cents < 100) { alert('Minimum donation is $1.00'); return; }
     if (cents > 20000) { alert('Maximum donation is $200'); return; }
     setPaymentLoading(true);
     try {
@@ -1679,7 +1679,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
             React.createElement('div', { style: { fontSize: 24 } }, '💜'),
             React.createElement('div', null,
               React.createElement('h3', { style: { marginBottom: 4 } }, 'Support rslvd'),
-              React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, 'Donations are the only way to unlock donor access. Our goal is $22.50 a month to keep rslvd running. Every $22.50 gives you 30 days of donor access.'),
+              React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, 'Donations are the only way to unlock donor access. Our goal is $22.50 a month to keep rslvd running. Any donation, minimum $1, gives you 3 months of donor access.'),
               React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, marginTop: 4 } }, 'Donor access: unlimited hostnames and tunnels, SSH and ADB tunnels, and nested subdomains & tunnels.'),
               user.isSiteOwner
                 ? React.createElement('p', { style: { color: 'var(--accent2)', fontSize: 13, marginTop: 4, fontWeight: 600 } }, 'Site owner: unlimited access, no donation needed.')
@@ -1689,9 +1689,9 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
           React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setShowDonate(!showDonate) }, showDonate ? 'Cancel' : 'Donate')
         ),
         showDonate && React.createElement('div', { style: { marginTop: 16 } },
-          React.createElement('label', { style: { fontSize: 13, color: 'var(--text2)', display: 'block', marginBottom: 6 } }, 'Amount (USD, min $0.50)'),
+          React.createElement('label', { style: { fontSize: 13, color: 'var(--text2)', display: 'block', marginBottom: 6 } }, 'Amount (USD, min $1)'),
           React.createElement('input', {
-            className: 'input', type: 'number', min: '0.50', max: '200', step: '0.50',
+            className: 'input', type: 'number', min: '1', max: '200', step: '0.50',
             value: donateAmount, onChange: e => setDonateAmount(e.target.value),
             style: { maxWidth: 160, marginBottom: 12 }
           }),

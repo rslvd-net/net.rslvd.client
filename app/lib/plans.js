@@ -1,10 +1,10 @@
-// Donation-only model. There are no subscriptions. Donating grants donor access
-// for a period proportional to the amount: GOAL_CENTS pays for MONTH_DAYS.
+// Donation-only model. There are no subscriptions. Any donation grants donor
+// access for a flat term of DONOR_DAYS (3 months).
 const DONATION = {
-  minCents: 50,
+  minCents: 100,
   maxCents: 20000,
   goalCents: 2250,
-  monthDays: 30,
+  donorDays: 90,
 };
 
 const FREE_LIMITS = { maxHosts: 2, maxTunnels: 2 };
@@ -46,12 +46,9 @@ function limitsFor(user) {
   return { hosts: FREE_LIMITS.maxHosts, tunnels: FREE_LIMITS.maxTunnels };
 }
 
-/**
- * Days of donor access granted by a donation of `cents`:
- * $22.50 = 30 days, pro-rated. Always at least one day.
- */
-function donationDays(cents) {
-  return Math.max(1, Math.round((cents / DONATION.goalCents) * DONATION.monthDays));
+/** Days of donor access granted by any donation: a flat 3 months (90 days). */
+function donationDays() {
+  return DONATION.donorDays;
 }
 
 module.exports = {

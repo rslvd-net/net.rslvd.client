@@ -68,8 +68,8 @@ async function storeCard(user, customerId, sourceId) {
   return card;
 }
 
-// Pay-what-you-want donation. $22.50 = 30 days of donor access, pro-rated for
-// smaller amounts. Donating extends an active donor window.
+// Pay-what-you-want donation. Any donation (minimum $1) grants 3 months of
+// donor access. Donating extends an active donor window.
 router.post('/donate', requireAuth, requireGateway, async (req, res) => {
   try {
     const { amountCents, sourceId } = req.body;

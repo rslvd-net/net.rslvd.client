@@ -14,7 +14,7 @@ const SYSTEM_PROMPT = `You are the support assistant for rslvd.privatedns.org, a
 Facts about rslvd.privatedns.org:
 - Users get permanent subdomains like yourname.rslvd.privatedns.org that point at their home IP (DDNS), and reverse tunnels that expose local services even behind CGNAT (no port forwarding needed).
 - Free accounts: 2 hostnames, 2 tunnels, no SSH/ADB tunnels, no nesting. Donor access (donation only, no subscriptions): unlimited hostnames and tunnels, SSH/ADB tunnels, and nested subdomains like api.yourname.rslvd.privatedns.org.
-- Donations: $22.50 = 30 days of donor access (smaller donations pro-rate, minimum $0.50). Donating again extends the window. The monthly goal is $22.50.
+- Donations: any donation (minimum $1) grants 3 months of donor access. Donating again extends the window. The monthly goal is $22.50.
 - DDNS updates use the standard DynDNS protocol: GET https://rslvd.privatedns.org/api/update?key=UPDATE_KEY&ip=1.2.3.4 (responses: good, nochg, badauth). Works with ddclient, routers (DD-WRT/OpenWrt), and the rslvd apps.
 - Each hostname has an Update Key (shown on the host card, can be regenerated). Each tunnel has a connect token.
 - Tunnels: run "rslvd-tunnel TOKEN LOCAL_PORT" (download at rslvd.privatedns.org/downloads), or use the Android app's built-in tunnel client. Protocols: TCP (default), UDP (-udp), plus premium remote access: SSH (-ssh TOKEN 22) and ADB (-adb TOKEN 5555), which publish a real public TCP port (20000-29999) on the server so you connect with "ssh -p PORT user@yourname.rslvd.net" or "adb connect yourname.rslvd.net:PORT". Remote access requires donor access.
