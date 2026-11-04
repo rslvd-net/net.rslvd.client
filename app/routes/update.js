@@ -3,6 +3,7 @@ const pool = require('../db/pool');
 const ionos = require('../lib/ionos');
 const dnsAudit = require('../lib/dns-audit');
 const rateLimit = require('express-rate-limit');
+const { hasRemoteAccess } = require('../lib/plans');
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,
@@ -26,7 +27,7 @@ router.get('/', async (req, res) => {
     if (!key) return res.status(400).send('badauth');
 
     const result = await pool.query(
-      `SELECT h.*, u.subscription_status, u.plan_expires_at
+      `SELECT h.*, u.bonus_expires_at, u.is_site_owner, u.is_admin
        FROM hosts h JOIN users u ON h.user_id = u.id
        WHERE h.update_key = $1 AND h.active = TRUE`,
       [key]
@@ -35,11 +36,8 @@ router.get('/', async (req, res) => {
     const host = result.rows[0];
     if (!host) return res.status(401).send('badauth');
 
-    // Check subscription
-    if (host.subscription_status !== 'active' && host.subscription_status !== 'cancelling' && host.subscription_status !== 'free' && host.subscription_status !== 'inactive') return res.status(403).send('notdonator');
-    if (host.subscription_status !== 'free' && host.subscription_status !== 'inactive' && host.plan_expires_at && new Date(host.plan_expires_at) < new Date()) {
-      return res.status(403).send('notdonator');
-    }
+    // Dynamic DNS updates are for donors and the site owner
+    if (!hasRemoteAccess(host)) return res.status(403).send('notdonator');
 
     // Validate IPs
     if (ipv4 && !isValidIPv4(ipv4)) return res.status(400).send('dnserr');

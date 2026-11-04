@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - **JDK 17**
-- **Android SDK 36** + NDK `27.2.12479018` (for the terminal's PTY helper); export `ANDROID_HOME` (or set
+- **Android SDK 36**; export `ANDROID_HOME` (or set
   `sdk.dir` in `local.properties`).
 - Gradle is provided via the wrapper (`./gradlew`, Gradle 8.11.1, AGP 8.9.2).
 

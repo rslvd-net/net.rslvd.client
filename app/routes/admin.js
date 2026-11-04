@@ -50,9 +50,9 @@ router.get('/stats', async (req, res) => {
       pool.query('SELECT COUNT(*) FROM users'),
       pool.query('SELECT COUNT(*) FROM hosts'),
       pool.query('SELECT COUNT(*) FROM tunnels WHERE active = TRUE'),
-      pool.query("SELECT COUNT(*) FROM users WHERE subscription_status = 'active'"),
-      pool.query("SELECT plan, COUNT(*) FROM users GROUP BY plan ORDER BY COUNT(*) DESC"),
-      pool.query("SELECT id, email, plan, subscription_status, created_at FROM users ORDER BY created_at DESC LIMIT 5"),
+      pool.query("SELECT COUNT(*) FROM users WHERE bonus_expires_at > NOW()"),
+      pool.query("SELECT COUNT(*) FILTER (WHERE bonus_expires_at > NOW())::int AS donors, COUNT(*) FILTER (WHERE bonus_expires_at IS NULL OR bonus_expires_at <= NOW())::int AS free FROM users"),
+      pool.query("SELECT id, email, bonus_expires_at, created_at FROM users ORDER BY created_at DESC LIMIT 5"),
     ]);
     res.json({
       totalUsers: parseInt(users.rows[0].count),
@@ -71,8 +71,8 @@ router.get('/stats', async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, email, plan, subscription_status, max_hosts, max_tunnels,
-              is_admin, is_site_owner, plan_expires_at, created_at
+      `SELECT id, email, bonus_expires_at,
+              is_admin, is_site_owner, created_at
        FROM users ORDER BY created_at DESC LIMIT 200`
     );
     res.json(result.rows);
@@ -84,7 +84,7 @@ router.get('/users', async (req, res) => {
 router.get('/users/:id', async (req, res) => {
   try {
     const [user, hosts, tunnels] = await Promise.all([
-      pool.query('SELECT id, email, plan, subscription_status, max_hosts, max_tunnels, is_admin, is_site_owner, plan_expires_at, created_at FROM users WHERE id = $1', [req.params.id]),
+      pool.query('SELECT id, email, bonus_expires_at, is_admin, is_site_owner, created_at FROM users WHERE id = $1', [req.params.id]),
       pool.query('SELECT id, fqdn, ip_address, last_updated, active FROM hosts WHERE user_id = $1', [req.params.id]),
       pool.query('SELECT id, name, fqdn, tunnel_port, status, active, created_at FROM tunnels WHERE user_id = $1', [req.params.id]),
     ]);
@@ -98,14 +98,12 @@ router.get('/users/:id', async (req, res) => {
 router.patch('/users/:id', async (req, res) => {
   try {
     const isSiteOwner = req.user.is_site_owner;
-    const { plan, maxHosts, maxTunnels, subscriptionStatus, isAdmin, isSiteOwnerFlag } = req.body;
+    const { donorExpiresAt, isAdmin, isSiteOwnerFlag } = req.body;
     const fields = [];
     const vals = [];
     let i = 1;
-    if (plan !== undefined) { fields.push(`plan = $${i++}`); vals.push(plan); }
-    if (maxHosts !== undefined) { fields.push(`max_hosts = $${i++}`); vals.push(maxHosts); }
-    if (maxTunnels !== undefined) { fields.push(`max_tunnels = $${i++}`); vals.push(maxTunnels); }
-    if (subscriptionStatus !== undefined) { fields.push(`subscription_status = $${i++}`); vals.push(subscriptionStatus); }
+    // Donor window: set or clear manually (e.g. comp a donor)
+    if (donorExpiresAt !== undefined) { fields.push(`bonus_expires_at = ${i++}`); vals.push(donorExpiresAt || null); }
     // Only site_owner can grant/revoke admin or site_owner
     if (isAdmin !== undefined && isSiteOwner) { fields.push(`is_admin = $${i++}`); vals.push(isAdmin); }
     if (isSiteOwnerFlag !== undefined && isSiteOwner) { fields.push(`is_site_owner = $${i++}`); vals.push(isSiteOwnerFlag); }

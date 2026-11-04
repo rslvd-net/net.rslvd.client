@@ -164,7 +164,7 @@ const tcpControlServer = net.createServer(async (conn) => {
   try {
     const result = await pool.query(
       `SELECT t.id, t.fqdn, t.protocol, t.status, t.device_lock, t.bound_device, t.tunnel_port,
-              u.plan, u.plan_expires_at, u.is_site_owner, u.is_admin
+              u.bonus_expires_at, u.is_site_owner, u.is_admin
        FROM tunnels t LEFT JOIN users u ON t.user_id = u.id
        WHERE t.token = $1 AND t.active = TRUE`,
       [token]
@@ -184,9 +184,9 @@ const tcpControlServer = net.createServer(async (conn) => {
 
   const isRemoteAccess = isRawProtocol(row.protocol);
 
-  // Remote-access tunnels (SSH/ADB) are a premium feature
+  // Remote-access tunnels (SSH/ADB) are donor-only
   if (isRemoteAccess && !hasRemoteAccess(row)) {
-    sendLine(conn, 'ERR remote access (SSH/ADB) requires a paid plan — upgrade at rslvd.net/pricing');
+    sendLine(conn, 'ERR remote access (SSH/ADB) requires a donation — see rslvd.net/donate');
     conn.destroy();
     return;
   }

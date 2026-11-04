@@ -4,7 +4,11 @@ const pool = require('../db/pool');
 const { notifyAdmin } = require('../lib/notify');
 
 async function userByPayment(paymentId) {
-  const { rows } = await pool.query('SELECT id, email FROM users WHERE subscription_id = $1', [paymentId]);
+  const { rows } = await pool.query(
+    `SELECT u.id, u.email FROM payment_intents p JOIN users u ON u.id = p.user_id
+     WHERE p.square_payment_id = $1`,
+    [paymentId]
+  );
   return rows[0] || null;
 }
 
@@ -30,7 +34,7 @@ function money(m) {
 
 // Square webhook notifications. Renewals are managed by the in-process
 // billing-renewal job; this handler reacts to out-of-band events (refunds,
-// disputes, failed payments) and keeps subscription state in sync.
+// disputes, failed payments). Donor access is time-based, so events only notify.
 router.post('/', async (req, res) => {
   try {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -62,18 +66,10 @@ router.post('/', async (req, res) => {
         const refund = event.data && event.data.object && event.data.object.refund;
         if (!refund || !refund.payment_id) break;
         const user = await userByPayment(refund.payment_id);
-        if (refund.status === 'COMPLETED') {
-          await pool.query(
-            `UPDATE users SET subscription_status = 'inactive', plan = 'free', max_hosts = 2, max_tunnels = 2,
-             subscription_id = NULL, plan_expires_at = NULL, updated_at = NOW()
-             WHERE subscription_id = $1`,
-            [refund.payment_id]
-          );
-        }
         notifyAdmin(
           `Refund ${refund.status}`,
           `${money(refund.amount_money)} refund for ${user ? user.email : `payment ${refund.payment_id}`}` +
-          (refund.status === 'COMPLETED' && user ? ' — account downgraded to free' : '')
+          ''
         );
         break;
       }
@@ -93,15 +89,10 @@ router.post('/', async (req, res) => {
         const payment = event.data && event.data.object && event.data.object.payment;
         if (!payment) break;
         if (payment.status === 'FAILED' || payment.status === 'CANCELED') {
-          await pool.query(
-            `UPDATE users SET subscription_status = 'past_due', updated_at = NOW()
-             WHERE subscription_id = $1 AND subscription_status = 'active'`,
-            [payment.id]
-          );
           const user = await userByPayment(payment.id);
           notifyAdmin(
             `Payment ${payment.status}`,
-            `${money(payment.amount_money)} payment ${payment.status.toLowerCase()}${user ? ` for ${user.email}` : ''} — marked past_due`
+            `${money(payment.amount_money)} payment ${payment.status.toLowerCase()}${user ? ` for ${user.email}` : ''}`
           );
         }
         break;
@@ -114,12 +105,6 @@ router.post('/', async (req, res) => {
         let user = null;
         if (paymentId) {
           user = await userByPayment(paymentId);
-          if (type === 'dispute.created') {
-            await pool.query(
-              `UPDATE users SET subscription_status = 'past_due', updated_at = NOW() WHERE subscription_id = $1`,
-              [paymentId]
-            );
-          }
         }
         notifyAdmin(
           `Dispute ${dispute ? dispute.state || dispute.status || '' : ''}`.trim(),

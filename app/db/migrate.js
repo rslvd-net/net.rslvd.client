@@ -81,6 +81,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(64);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_pending_secret VARCHAR(64);
 ALTER TABLE users ALTER COLUMN plan SET DEFAULT 'free';
+ALTER TABLE hosts ADD COLUMN IF NOT EXISTS parent_tunnel_id UUID REFERENCES tunnels(id) ON DELETE CASCADE;
+ALTER TABLE tunnels ADD COLUMN IF NOT EXISTS parent_host_id UUID REFERENCES hosts(id) ON DELETE CASCADE;
 ALTER TABLE users ALTER COLUMN max_hosts SET DEFAULT 1;
 UPDATE users SET plan = 'free', max_hosts = 1, max_tunnels = 1 WHERE plan = 'none' AND subscription_status = 'inactive';
 
@@ -298,6 +300,12 @@ ALTER TABLE tunnels ALTER COLUMN protocol TYPE VARCHAR(16);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tunnels_tunnel_port ON tunnels(tunnel_port) WHERE tunnel_port IS NOT NULL;
 -- DNS2TCP is no longer supported: keep the tunnels usable as plain TCP tunnels
 UPDATE tunnels SET protocol = 'tcp' WHERE protocol = 'dns2tcp';
+
+-- Donation-only model: subscriptions are retired. Clear legacy subscription
+-- state and make the site owner a permanent donor (idempotent).
+UPDATE users SET subscription_status = 'free', plan = 'free', subscription_id = NULL, plan_expires_at = NULL
+  WHERE subscription_status IS DISTINCT FROM 'free' OR plan IS DISTINCT FROM 'free' OR subscription_id IS NOT NULL;
+UPDATE users SET bonus_expires_at = '2100-01-01T00:00:00Z' WHERE is_site_owner = TRUE;
 `;
 
 async function run() {

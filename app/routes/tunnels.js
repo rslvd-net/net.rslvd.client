@@ -6,15 +6,14 @@ const ionos = require('../lib/ionos');
 const activity = require('../lib/activity');
 const dnsAudit = require('../lib/dns-audit');
 const tunnelCert = require('../lib/tunnel-cert');
-const { activeBonus, isRemoteProtocol, hasRemoteAccess } = require('../lib/plans');
+const { isRemoteProtocol, hasRemoteAccess, canNest, limitsFor } = require('../lib/plans');
 const tunnelProxy = require('../lib/tunnel-proxy');
 
 const PORT_MIN = 20000;
 const PORT_MAX = 29999;
 const LABEL_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
-const CAN_NEST  = (user) => user.plan === 'annual' || user.is_site_owner;
 
-// tcp/udp ride the HTTP & UDP proxies; ssh/adb are premium raw-port tunnels
+// tcp/udp ride the HTTP & UDP proxies; ssh/adb are donor-only raw-port tunnels
 const ALLOWED_PROTOCOLS = ['tcp', 'udp', 'ssh', 'adb'];
 const SERVER_HOST = () => process.env.BASE_DOMAIN || 'rslvd.net';
 
@@ -51,9 +50,9 @@ router.use(requireAuth);
 router.get('/', async (req, res) => {
   const result = await pool.query(
     `SELECT id, name, tunnel_port, target_host, target_port, protocol,
-            status, fqdn, token, active, created_at, parent_tunnel_id, force_https,
+            status, fqdn, token, active, created_at, parent_tunnel_id, parent_host_id, force_https,
             device_lock, bound_device_name, bound_at
-     FROM tunnels WHERE user_id = $1 ORDER BY parent_tunnel_id NULLS FIRST, created_at DESC`,
+     FROM tunnels WHERE user_id = $1 ORDER BY parent_tunnel_id NULLS FIRST, parent_host_id NULLS FIRST, created_at DESC`,
     [req.user.id]
   );
   res.json(result.rows.map((t) => ({ ...withRemoteMeta(t), connected: tunnelProxy.isConnected(t.fqdn) })));
@@ -79,7 +78,7 @@ router.get('/remote-access', async (req, res) => {
 // ── Create tunnel ────────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
   try {
-    const { name, target_port, target_host = 'localhost', protocol = 'tcp', parent_id, force_https = true } = req.body;
+    const { name, target_port, target_host = 'localhost', protocol = 'tcp', parent_id, parent_kind = 'tunnel', force_https = true } = req.body;
     if (!name || !target_port) return res.status(400).json({ error: 'name and target_port required' });
 
     const user = req.user;
@@ -94,52 +93,39 @@ router.post('/', async (req, res) => {
     // ── Premium gate: SSH/ADB over a raw public port ──────────────────────────
     if (remote && !hasRemoteAccess(user)) {
       return res.status(403).json({
-        error: 'Remote access (SSH/ADB over a public port) is a premium feature. Upgrade your plan to unlock it.',
+        error: 'Remote access (SSH/ADB over a public port) is for donors. Donate to unlock it.',
         upgrade_required: true,
       });
     }
-    if (remote && parent_id) {
-      return res.status(400).json({ error: 'SSH/ADB tunnels must be top-level — nested subdomains are HTTP only.' });
-    }
-
     // ── Nested tunnel path ───────────────────────────────────────────────────
     if (parent_id) {
-      if (!CAN_NEST(user)) {
-        return res.status(403).json({ error: 'Nested subdomain tunnels require an Annual plan.' });
+      if (!canNest(user)) {
+        return res.status(403).json({ error: 'Nested tunnels are for donors. Donate to unlock them.' });
       }
       if (!LABEL_RE.test(name)) {
         return res.status(400).json({ error: 'Invalid label. Lowercase letters, numbers, hyphens only.' });
       }
 
-      // Verify parent tunnel belongs to this user and is top-level
+      // Verify parent (a tunnel or a host) belongs to this user
+      const parentTable = parent_kind === 'host' ? 'hosts' : 'tunnels';
       const parentResult = await pool.query(
-        'SELECT id, fqdn, name FROM tunnels WHERE id = $1 AND user_id = $2 AND active = TRUE',
+        `SELECT id, fqdn FROM ${parentTable} WHERE id = $1 AND user_id = $2 AND active = TRUE`,
         [parent_id, user.id]
       );
       const parent = parentResult.rows[0];
-      if (!parent) return res.status(404).json({ error: 'Parent tunnel not found or not yours.' });
-
-      const parentNested = await pool.query(
-        'SELECT id FROM tunnels WHERE id = $1 AND parent_tunnel_id IS NOT NULL', [parent_id]
-      );
-      if (parentNested.rows[0]) {
-        return res.status(400).json({ error: 'Cannot nest more than 1 level deep.' });
-      }
+      if (!parent) return res.status(404).json({ error: 'Parent not found or not yours.' });
 
       const fqdn = `${name}.${parent.fqdn}`;
 
       const existing = await pool.query('SELECT id FROM tunnels WHERE fqdn = $1', [fqdn]);
       if (existing.rows[0]) return res.status(409).json({ error: 'That subdomain is already taken.' });
 
-      if (user.plan !== 'free' && user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) {
-        return res.status(403).json({ error: 'Subscription expired' });
-      }
       const countResult = await pool.query(
         'SELECT COUNT(*) FROM tunnels WHERE user_id = $1 AND active = TRUE', [user.id]
       );
-      const limit = (user.max_tunnels || 1) + activeBonus(user).tunnels;
+      const limit = limitsFor(user).tunnels;
       if (parseInt(countResult.rows[0].count) >= limit) {
-        return res.status(403).json({ error: `Tunnel limit reached (${limit}). Upgrade to add more.` });
+        return res.status(403).json({ error: `Tunnel limit reached (${limit}). Donate to add more.` });
       }
 
       const token = crypto.randomBytes(2).toString('hex').slice(0, 4);
@@ -147,11 +133,12 @@ router.post('/', async (req, res) => {
       const wantHttps = force_https !== false;
       const result = await pool.query(
         `INSERT INTO tunnels (user_id, name, target_host, target_port, protocol,
-                              status, fqdn, token, parent_tunnel_id, force_https)
-         VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8,$9)
+                              status, fqdn, token, parent_tunnel_id, parent_host_id, force_https)
+         VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8,$9,$10)
          RETURNING id, name, target_host, target_port, protocol,
-                   status, fqdn, token, active, created_at, parent_tunnel_id, force_https`,
-        [user.id, name, target_host, target_port, protocolKey, fqdn, token, parent_id, wantHttps]
+                   status, fqdn, token, active, created_at, parent_tunnel_id, parent_host_id, force_https`,
+        [user.id, name, target_host, target_port, protocolKey, fqdn, token,
+         parentTable === 'tunnels' ? parent_id : null, parentTable === 'hosts' ? parent_id : null, wantHttps]
       );
 
       try {
@@ -179,15 +166,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid name. Lowercase letters, numbers, hyphens only.' });
     }
 
-    const limit = (user.max_tunnels || 1) + activeBonus(user).tunnels;
-    if (user.plan !== 'free' && user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) {
-      return res.status(403).json({ error: 'Subscription expired' });
-    }
+    const limit = limitsFor(user).tunnels;
     const countResult = await pool.query(
       'SELECT COUNT(*) FROM tunnels WHERE user_id = $1 AND active = TRUE', [user.id]
     );
     if (parseInt(countResult.rows[0].count) >= limit) {
-      return res.status(403).json({ error: `Tunnel limit reached (${limit} for your plan). Upgrade to add more.` });
+      return res.status(403).json({ error: `Tunnel limit reached (${limit}). Donate to add more.` });
     }
 
     // Block reserved subdomains

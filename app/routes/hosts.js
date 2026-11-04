@@ -7,35 +7,25 @@ const ionos = require('../lib/ionos');
 const activity = require('../lib/activity');
 const dnsAudit = require('../lib/dns-audit');
 const tunnelCert = require('../lib/tunnel-cert');
-const { activeBonus } = require('../lib/plans');
-
-const PLAN_LIMITS = {
-  free: 2,
-  none: 0,
-  monthly: 4,
-  quarterly: 12,
-  semi_annual: 24,
-  annual: 999999,
-};
+const { canNest, limitsFor } = require('../lib/plans');
 
 router.use(requireAuth);
 
 // List user's hosts
 router.get('/', async (req, res) => {
   const result = await pool.query(
-    'SELECT id, hostname, fqdn, ip_address, ipv6_address, last_updated, update_key, active, created_at, parent_host_id, force_https FROM hosts WHERE user_id = $1 ORDER BY parent_host_id NULLS FIRST, created_at DESC',
+    'SELECT id, hostname, fqdn, ip_address, ipv6_address, last_updated, update_key, active, created_at, parent_host_id, parent_tunnel_id, force_https FROM hosts WHERE user_id = $1 ORDER BY parent_host_id NULLS FIRST, parent_tunnel_id NULLS FIRST, created_at DESC',
     [req.user.id]
   );
   res.json(result.rows);
 });
 
 const LABEL_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
-const CAN_NEST = (user) => user.plan === 'annual' || user.is_site_owner;
 
 // Create a host
 router.post('/', async (req, res) => {
   try {
-    const { hostname, parent_id, force_https = true } = req.body;
+    const { hostname, parent_id, parent_kind = 'host', force_https = true } = req.body;
     if (!hostname) return res.status(400).json({ error: 'Hostname required' });
 
     const user = req.user;
@@ -43,8 +33,8 @@ router.post('/', async (req, res) => {
 
     // ── Nested subdomain path ───────────────────────────────────────────────
     if (parent_id) {
-      if (!CAN_NEST(user)) {
-        return res.status(403).json({ error: 'Nested subdomains require an Annual plan.' });
+      if (!canNest(user)) {
+        return res.status(403).json({ error: 'Nested subdomains are for donors. Donate to unlock them.' });
       }
 
       // Validate the sub-label (single label only, no dots)
@@ -52,19 +42,14 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: 'Invalid label. Use lowercase letters, numbers, and hyphens only.' });
       }
 
-      // Verify parent belongs to this user
+      // Verify parent (a host or a tunnel) belongs to this user
+      const parentTable = parent_kind === 'tunnel' ? 'tunnels' : 'hosts';
       const parentResult = await pool.query(
-        'SELECT id, fqdn, hostname FROM hosts WHERE id = $1 AND user_id = $2 AND active = TRUE',
+        `SELECT id, fqdn FROM ${parentTable} WHERE id = $1 AND user_id = $2 AND active = TRUE`,
         [parent_id, user.id]
       );
       const parent = parentResult.rows[0];
-      if (!parent) return res.status(404).json({ error: 'Parent host not found or not yours.' });
-
-      // Only allow 1 level deep (parent must itself be a top-level host)
-      const parentNested = await pool.query('SELECT id FROM hosts WHERE id = $1 AND parent_host_id IS NOT NULL', [parent_id]);
-      if (parentNested.rows[0]) {
-        return res.status(400).json({ error: 'Cannot nest more than 1 level deep.' });
-      }
+      if (!parent) return res.status(404).json({ error: 'Parent not found or not yours.' });
 
       const fqdn = `${hostname}.${parent.fqdn}`;
 
@@ -73,22 +58,19 @@ router.post('/', async (req, res) => {
       if (existing.rows[0]) return res.status(409).json({ error: 'That subdomain is already taken.' });
 
       // Count against the same host limit
-      if (user.plan !== 'free' && user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) {
-        return res.status(403).json({ error: 'Subscription expired' });
-      }
       const countResult = await pool.query('SELECT COUNT(*) FROM hosts WHERE user_id = $1 AND active = TRUE', [user.id]);
-      const limit = (user.max_hosts || PLAN_LIMITS[user.plan] || 0) + activeBonus(user).hosts;
+      const limit = limitsFor(user).hosts;
       if (parseInt(countResult.rows[0].count) >= limit) {
-        return res.status(403).json({ error: `Host limit reached (${limit}). Upgrade to add more.` });
+        return res.status(403).json({ error: `Host limit reached (${limit}). Donate to add more.` });
       }
 
       const updateKey = crypto.randomBytes(2).toString('hex').slice(0, 4);
       const wantHttps = force_https !== false;
       const result = await pool.query(
-        `INSERT INTO hosts (user_id, hostname, fqdn, update_key, parent_host_id, force_https)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, hostname, fqdn, ip_address, ipv6_address, last_updated, update_key, active, created_at, parent_host_id, force_https`,
-        [user.id, hostname, fqdn, updateKey, parent_id, wantHttps]
+        `INSERT INTO hosts (user_id, hostname, fqdn, update_key, parent_host_id, parent_tunnel_id, force_https)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, hostname, fqdn, ip_address, ipv6_address, last_updated, update_key, active, created_at, parent_host_id, parent_tunnel_id, force_https`,
+        [user.id, hostname, fqdn, updateKey, parentTable === 'hosts' ? parent_id : null, parentTable === 'tunnels' ? parent_id : null, wantHttps]
       );
 
       // Auto-provision SSL cert for nested subdomain (only when HTTPS enabled)
@@ -108,18 +90,10 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid hostname. Use lowercase letters, numbers, and hyphens only.' });
     }
 
-    // Check subscription limit
-    const limit = (user.max_hosts || PLAN_LIMITS[user.plan] || 0) + activeBonus(user).hosts;
-    if (limit === 0) return res.status(403).json({ error: 'Upgrade your plan to create more hosts' });
-
-    // Check paid plan expiry (free tier never expires)
-    if (user.plan !== 'free' && user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) {
-      return res.status(403).json({ error: 'Subscription expired' });
-    }
-
+    const limit = limitsFor(user).hosts;
     const countResult = await pool.query('SELECT COUNT(*) FROM hosts WHERE user_id = $1 AND active = TRUE', [user.id]);
     if (parseInt(countResult.rows[0].count) >= limit) {
-      return res.status(403).json({ error: `Host limit reached (${limit} for your plan). Upgrade to add more.` });
+      return res.status(403).json({ error: `Host limit reached (${limit}). Donate to add more.` });
     }
 
     // Block reserved subdomains (site_owner may bypass)

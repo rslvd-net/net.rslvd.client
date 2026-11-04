@@ -139,6 +139,20 @@ router.post('/:id/escalate', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Delete an answered ticket (ticket owner or staff) ───────────────────────
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const u = req.user;
+    const { rows: [ticket] } = await pool.query('SELECT * FROM support_tickets WHERE id = $1', [req.params.id]);
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+    if (!isStaff(u) && ticket.user_id !== u.id) return res.status(403).json({ error: 'Forbidden' });
+    if (ticket.status !== 'answered') return res.status(400).json({ error: 'Only answered tickets can be deleted' });
+
+    await pool.query('DELETE FROM support_tickets WHERE id = $1', [ticket.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Update ticket status (staff only) ────────────────────────────────────────
 router.patch('/:id', requireAuth, async (req, res) => {
   try {

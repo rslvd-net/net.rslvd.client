@@ -7,7 +7,7 @@ const speakeasy = require('speakeasy');
 const pool = require('../db/pool');
 const activity = require('../lib/activity');
 const { sendMail } = require('../lib/mailer');
-const { activeBonus } = require('../lib/plans');
+const { isDonor, isOwner, limitsFor } = require('../lib/plans');
 
 const CURRENT_LEGAL_VERSION = '2026-05-31';
 
@@ -27,10 +27,9 @@ router.post('/register', async (req, res) => {
     const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, plan, max_hosts, max_tunnels, subscription_status,
-       email_verification_token, email_verification_expires, tos_version_accepted)
-       VALUES ($1, $2, 'free', 2, 2, 'free', $3, $4, $5)
-       RETURNING id, email, subscription_status, plan, max_hosts, max_tunnels, email_verified, tos_version_accepted`,
+      `INSERT INTO users (email, password_hash, email_verification_token, email_verification_expires, tos_version_accepted)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, email, email_verified, tos_version_accepted`,
       [email.toLowerCase(), hash, verifyToken, verifyExpires, CURRENT_LEGAL_VERSION]
     );
 
@@ -57,10 +56,9 @@ router.post('/register', async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        plan: user.plan,
-        maxHosts: user.max_hosts,
-        maxTunnels: user.max_tunnels,
-        status: user.subscription_status,
+        plan: 'free',
+        maxHosts: 2,
+        maxTunnels: 2,
         role: 'user',
         emailVerified: user.email_verified || false,
         tosAccepted: user.tos_version_accepted === CURRENT_LEGAL_VERSION,
@@ -102,10 +100,11 @@ router.post('/login', async (req, res) => {
         id: user.id,
         email: user.email,
         displayName: user.display_name,
-        plan: user.plan,
-        maxHosts: user.max_hosts,
-        maxTunnels: user.max_tunnels,
-        status: user.subscription_status,
+        plan: isDonor(user) || isOwner(user) ? 'donor' : 'free',
+        maxHosts: limitsFor(user).hosts,
+        maxTunnels: limitsFor(user).tunnels,
+        donor: isDonor(user),
+        donorExpiresAt: isDonor(user) ? user.bonus_expires_at : null,
         isAdmin: user.is_admin,
         isSiteOwner: user.is_site_owner,
         totpEnabled: user.totp_enabled,
@@ -124,20 +123,18 @@ router.post('/login', async (req, res) => {
 router.get('/me', require('../middleware/auth').requireAuth, async (req, res) => {
   try {
     const u = req.user;
-    const bonus = activeBonus(u);
+    const limits = limitsFor(u);
+    const donor = isDonor(u);
     res.json({
       id: u.id,
       email: u.email,
       displayName: u.display_name,
-      plan: u.plan,
-      maxHosts: (u.max_hosts || 0) + bonus.hosts,
-      maxTunnels: (u.max_tunnels || 0) + bonus.tunnels,
-      bonusHosts: bonus.hosts,
-      bonusTunnels: bonus.tunnels,
-      bonusExpiresAt: bonus.expiresAt,
+      plan: donor ? 'donor' : 'free',
+      maxHosts: limits.hosts,
+      maxTunnels: limits.tunnels,
+      donor,
+      donorExpiresAt: donor ? u.bonus_expires_at : null,
       supporter: (u.donated_total_cents || 0) > 0,
-      status: u.subscription_status,
-      planExpiresAt: u.plan_expires_at,
       isAdmin: u.is_admin,
       isSiteOwner: u.is_site_owner,
       totpEnabled: u.totp_enabled || false,

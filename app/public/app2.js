@@ -115,15 +115,46 @@ function Nav({ user, logout, navigate, pwa }) {
 }
 
 // ── Landing ───────────────────────────────────────────────────────────────────
-function Landing({ navigate }) {
-  const plans = [
-    { key: 'free',       name: 'Free',      price: '$0',    period: 'forever',    hosts: 2,  tunnels: 2,  highlight: false },
-    { key: 'monthly',    name: 'Monthly',   price: '$0.99', period: '/month',     hosts: 4,  tunnels: 4,  highlight: false },
-    { key: 'quarterly',  name: 'Quarterly', price: '$1.99', period: '/3 months',  hosts: 12, tunnels: 12, highlight: false },
-    { key: 'semi_annual',name: '6 Months',  price: '$4.99', period: '/6 months',  hosts: 24, tunnels: 24, highlight: true  },
-    { key: 'annual',     name: 'Annual',    price: '$8.99', period: '/year',       hosts: 'Unlimited', tunnels: 'Unlimited', highlight: false },
-  ];
+// ── Donation goal bar ─────────────────────────────────────────────────────────
+function DonationGoal({ navigate }) {
+  const [goal, setGoal] = React.useState(null);
+  React.useEffect(() => {
+    fetch('/api/billing/goal').then(r => r.json()).then(setGoal).catch(() => {});
+  }, []);
+  const percent = goal ? Math.min(100, Math.max(0, goal.percent || 0)) : 0;
+  const money = cents => '$' + ((cents || 0) / 100).toFixed(2);
+  return React.createElement('div', { className: 'card', style: { textAlign: 'center', position: 'relative', overflow: 'hidden', borderColor: 'var(--accent)', boxShadow: '0 0 40px rgba(108,99,255,0.25)' } },
+    React.createElement('style', null, '@keyframes rslvdStripes{from{background-position:0 0}to{background-position:40px 0}}@keyframes rslvdPulse{0%,100%{box-shadow:0 0 12px rgba(108,99,255,0.5)}50%{box-shadow:0 0 28px rgba(108,99,255,0.9)}}'),
+    React.createElement('div', { style: { fontSize: 13, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--accent2)', fontWeight: 700, marginBottom: 6 } }, '💜 Monthly goal'),
+    React.createElement('h2', { style: { fontSize: 30, marginBottom: 4 } },
+      goal ? `${money(goal.raisedCents)} of ${money(goal.goalCents)}` : 'Loading goal…'
+    ),
+    React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 20 } }, 'rslvd is donation-funded. Help us hit our monthly goal and keep every tunnel online.'),
+    React.createElement('div', { style: { position: 'relative', height: 44, background: 'var(--bg3)', borderRadius: 999, border: '1px solid var(--border2)', overflow: 'hidden' } },
+      React.createElement('div', { style: {
+        width: `${percent}%`, height: '100%', borderRadius: 999,
+        background: 'linear-gradient(90deg, #6c63ff, #a78bfa, #22d3ee)',
+        backgroundSize: '40px 40px',
+        backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.18) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.18) 75%, transparent 75%)',
+        animation: 'rslvdStripes 1s linear infinite, rslvdPulse 2s ease-in-out infinite',
+        transition: 'width 1.2s ease'
+      } }),
+      React.createElement('div', { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' } },
+        goal ? `${Math.floor(percent)}%` : ''
+      )
+    ),
+    React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, marginTop: 16 } },
+      '$22.50 = 30 days of donor access: unlimited hostnames & tunnels, SSH & ADB tunnels, and nested subdomains & tunnels.'
+    ),
+    React.createElement('div', { style: { display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20 } },
+      React.createElement('button', { className: 'btn btn-primary btn-lg', onClick: () => navigate('/register') }, 'Create account & donate →'),
+      React.createElement('button', { className: 'btn btn-secondary btn-lg', onClick: () => navigate('/register') }, 'Start free')
+    ),
+    React.createElement('p', { style: { color: 'var(--text3)', fontSize: 12, marginTop: 14 } }, 'Free: 2 hostnames + 2 tunnels, forever. No ADB or SSH tunnels on free accounts.')
+  );
+}
 
+function Landing({ navigate }) {
   const features = [
     { icon: '🌐', title: 'Dynamic DNS', desc: 'Your subdomain on rslvd.privatedns.org always follows your home or office IP. Updates propagate in under 60 seconds.' },
     { icon: '🚇', title: 'CGNAT Tunnel', desc: 'Stuck behind carrier-grade NAT? Our TCP tunnel punches right through — no port forwarding, no ISP cooperation needed.' },
@@ -132,7 +163,7 @@ function Landing({ navigate }) {
     { icon: '🔗', title: 'DynDNS Compatible', desc: 'Drop-in replacement for any DynDNS client. Works with Asus, Synology, Ubiquiti, pfSense, and more.' },
     { icon: '🔒', title: 'Token Security', desc: 'Each host and tunnel gets its own unique token. Revoke or rotate instantly from your dashboard.' },
     { icon: '📱', title: 'Every Platform', desc: 'Single binary for Linux, macOS, Windows, Android (Termux), and routers. No dependencies, no runtime.' },
-    { icon: '🛰', title: 'Remote ADB & SSH', desc: 'Paid plans get raw-port tunnels: a real TCP port on rslvd.net for adb connect, ssh -p, RDP and more — no port forwarding, no VPN.' },
+    { icon: '🛰', title: 'Remote ADB & SSH', desc: 'Donors get raw-port tunnels: a real TCP port on rslvd.net for adb connect, ssh -p, RDP and more — no port forwarding, no VPN.' },
     { icon: '⚡', title: 'Instant Setup', desc: 'Register, grab your token, run one command. Your tunnel is live in under 30 seconds.' },
   ];
 
@@ -141,15 +172,15 @@ function Landing({ navigate }) {
     { icon: '💻', title: 'Dev & Testing', desc: 'Share a localhost dev server with a client or teammate instantly. No VPN, no ngrok account, no bandwidth limits.' },
     { icon: '📹', title: 'IP Cameras & NVRs', desc: 'Access your cameras remotely without a static IP. Point rslvd.privatedns.org at your NVR and you\'re done.' },
     { icon: '🌍', title: 'Remote Access', desc: 'SSH, RDP, VNC — tunnel any protocol. Access your home PC or office server from anywhere.' },
-    { icon: '🛰', title: 'ADB & SSH Tunnels', desc: 'Premium raw-port tunnels give you rslvd.net:<port> — adb connect to a phone or ssh into a box behind CGNAT from anywhere in the world.' },
+    { icon: '🛰', title: 'ADB & SSH Tunnels', desc: 'Donor raw-port tunnels give you rslvd.net:<port> — adb connect to a phone or ssh into a box behind CGNAT from anywhere in the world.' },
   ];
 
   const faqs = [
     { q: 'What is CGNAT?', a: 'Carrier-Grade NAT is when your ISP shares a single public IP across many customers. Port forwarding doesn\'t work because you don\'t actually own the public IP. Our tunnel bypasses this entirely.' },
     { q: 'How is this different from ngrok?', a: 'rslvd.privatedns.org gives you a permanent subdomain (not a random URL), supports WebSockets, works on routers and Android, has no session time limits, and costs a fraction of the price.' },
     { q: 'Does the tunnel support HTTPS?', a: 'Yes. All tunnels are served over HTTPS via *.rslvd.privatedns.org — our wildcard SSL certificate covers every subdomain. Your traffic is encrypted end-to-end from browser to server.' },
-    { q: 'Can I run multiple tunnels?', a: 'Yes. Free tier gets 2 tunnels. Paid plans scale up to unlimited. Each tunnel gets its own subdomain and token.' },
-    { q: 'Can I reach my phone or SSH server from anywhere?', a: 'Yes — on any paid plan. SSH (-ssh) and ADB (-adb) tunnels publish a real TCP port on rslvd.net, so from any machine you can run "adb connect rslvd.net:<port>" or "ssh -p <port> user@rslvd.net". Perfect for a home server or an Android device behind CGNAT.' },
+    { q: 'Can I run multiple tunnels?', a: 'Yes. Free accounts get 2 tunnels; donors get unlimited tunnels. Each tunnel gets its own subdomain and token.' },
+    { q: 'Can I reach my phone or SSH server from anywhere?', a: 'Yes — with donor access. SSH (-ssh) and ADB (-adb) tunnels publish a real TCP port on rslvd.net, so from any machine you can run "adb connect rslvd.net:<port>" or "ssh -p <port> user@rslvd.net". Perfect for a home server or an Android device behind CGNAT.' },
     { q: 'Does it work on OpenWRT / DD-WRT?', a: 'Yes — dedicated one-line installers for both. Auto-detects your router\'s architecture (MIPS, ARM, x86) and persistent storage location.' },
   ];
 
@@ -187,7 +218,7 @@ function Landing({ navigate }) {
     // ── Hero ──────────────────────────────────────────────────────────────────
     React.createElement('div', { className: 'hero' },
       React.createElement('div', { style: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: 'var(--accent-bg)', border: '1px solid rgba(108,99,255,0.3)', borderRadius: 999, fontSize: 13, color: 'var(--accent2)', marginBottom: 24 } },
-        '⚡ Free tier — 2 hosts + 2 tunnels, no credit card required'
+        '⚡ Free forever — 2 hosts + 2 tunnels, no credit card required'
       ),
       React.createElement('h1', null,
         'Your home server,\n',
@@ -198,7 +229,7 @@ function Landing({ navigate }) {
       ),
       React.createElement('div', { style: { display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 48 } },
         React.createElement('button', { className: 'btn btn-primary btn-lg', onClick: () => navigate('/register') }, 'Get started free →'),
-        React.createElement('button', { className: 'btn btn-secondary btn-lg', onClick: () => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }) }, 'See pricing')
+        React.createElement('button', { className: 'btn btn-secondary btn-lg', onClick: () => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }) }, 'See the goal')
       ),
       // Quick install strip
       React.createElement('div', { style: { maxWidth: 560, margin: '0 auto', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', textAlign: 'left' } },
@@ -245,32 +276,9 @@ function Landing({ navigate }) {
       )
     ),
 
-    // ── Pricing ───────────────────────────────────────────────────────────────
-    React.createElement('div', { id: 'pricing', style: { textAlign: 'center', marginBottom: 80, padding: '0 24px' } },
-      React.createElement('h2', { style: { fontSize: 28, marginBottom: 8 } }, 'Simple, honest pricing'),
-      React.createElement('p', { style: { color: 'var(--text2)', marginBottom: 40 } }, 'Start free. Upgrade when you need more. Cancel anytime.'),
-      React.createElement('div', { className: 'pricing-grid' },
-        plans.map(p => React.createElement('div', { key: p.key, className: `pricing-card${p.highlight ? ' popular' : ''}` },
-          p.highlight && React.createElement('div', { className: 'popular-badge' }, 'Best value'),
-          React.createElement('h3', { style: { color: 'var(--text2)', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 } }, p.name),
-          React.createElement('div', { className: 'price-amount' }, p.price),
-          React.createElement('div', { className: 'price-period' }, p.period),
-          React.createElement('ul', { className: 'price-features' },
-            React.createElement('li', null, `${p.hosts} subdomain${p.hosts > 1 ? 's' : ''}`),
-            React.createElement('li', null, `${p.tunnels} CGNAT tunnel${p.tunnels > 1 ? 's' : ''}`),
-            React.createElement('li', null, 'WebSocket support'),
-            React.createElement('li', null, 'IPv4 + IPv6'),
-            React.createElement('li', null, 'DynDNS compatible'),
-            p.key !== 'free'
-              ? React.createElement('li', null, '🛰 Remote ADB & SSH access')
-              : React.createElement('li', { style: { color: 'var(--text3)' } }, '🛰 ADB/SSH on paid plans'),
-            p.key === 'free' && React.createElement('li', null, 'No credit card')
-          ),
-          React.createElement('button', { className: 'btn btn-primary w-full', onClick: () => navigate('/register') },
-            p.key === 'free' ? 'Start free' : 'Get started'
-          )
-        ))
-      )
+    // ── Donation goal ─────────────────────────────────────────────────────────
+    React.createElement('div', { id: 'pricing', style: { maxWidth: 720, margin: '0 auto 80px', padding: '0 24px' } },
+      React.createElement(DonationGoal, { navigate })
     ),
 
     // ── DDNS quick-setup ──────────────────────────────────────────────────────
@@ -587,6 +595,16 @@ function SupportPage({ user, navigate }) {
     finally { setEscalating(false); }
   };
 
+  const handleDelete = async () => {
+    if (!viewing) return;
+    if (!confirm('Delete this answered ticket? This cannot be undone.')) return;
+    try {
+      await API.del(`/support/${viewing.id}`);
+      setViewing(null);
+      await load();
+    } catch (e) { alert(e.message); }
+  };
+
   const handleReply = async (e) => {
     e.preventDefault();
     if (!reply.trim() || !viewing) return;
@@ -671,7 +689,8 @@ function SupportPage({ user, navigate }) {
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
         React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: () => setViewing(null) }, '← All tickets'),
         React.createElement('span', { style: { fontSize: 11, fontWeight: 600, color: { open: 'var(--accent)', answered: 'var(--green)', escalated: 'var(--yellow)', closed: 'var(--text3)' }[viewing.status], textTransform: 'uppercase' } }, viewing.status === 'escalated' ? 'with the owner' : viewing.status),
-        viewing.status !== 'closed' && viewing.status !== 'escalated' && React.createElement('button', { className: 'btn btn-secondary btn-sm', style: { marginLeft: 'auto' }, onClick: handleEscalate, disabled: escalating }, escalating ? React.createElement(Spinner) : 'Escalate to a human')
+        viewing.status !== 'closed' && viewing.status !== 'escalated' && React.createElement('button', { className: 'btn btn-secondary btn-sm', style: { marginLeft: 'auto' }, onClick: handleEscalate, disabled: escalating }, escalating ? React.createElement(Spinner) : 'Escalate to a human'),
+        viewing.status === 'answered' && React.createElement('button', { className: 'btn btn-secondary btn-sm', style: { marginLeft: 'auto' }, onClick: handleDelete }, 'Delete ticket')
       ),
       React.createElement('div', { className: 'card', style: { marginBottom: 16 } },
         React.createElement('h2', { style: { fontSize: 17, marginBottom: 4 } }, viewing.subject),
@@ -702,12 +721,12 @@ const REMOTE_PROTOCOLS = ['ssh', 'adb'];
 const isRemoteProtocol = (p) => REMOTE_PROTOCOLS.includes(String(p || '').toLowerCase());
 const hasRemoteAccess = (user) => !!(user && (
   user.isSiteOwner || user.role === 'site_owner' || user.role === 'admin' ||
-  (user.plan && user.plan !== 'free' && user.status !== 'free' && user.status !== 'inactive')
+  user.donor || user.plan === 'donor'
 ));
 const protocolFlagFor = (p) => (p === 'udp' ? '-udp ' : isRemoteProtocol(p) ? `-${String(p).toLowerCase()} ` : '');
 
 // ── Tunnel Modal ──────────────────────────────────────────────────────────────
-function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
+function TunnelModal({ onClose, onCreated, user, existingTunnels, existingHosts }) {
   const [name, setName] = useState('');
   const [targetPort, setTargetPort] = useState('');
   const [protocol, setProtocol] = useState('tcp');
@@ -718,11 +737,14 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const canNest = user && (user.plan === 'annual' || user.role === 'site_owner' || user.role === 'admin');
-  const topLevelTunnels = (existingTunnels || []).filter(t => !t.parent_tunnel_id);
+  const canNest = hasRemoteAccess(user);
+  const parentOptions = [
+    ...(existingTunnels || []).filter(t => !t.parent_tunnel_id).map(t => ({ key: `tunnel:${t.id}`, label: `Tunnel: ${t.fqdn}`, fqdn: t.fqdn })),
+    ...(existingHosts || []).filter(h => !h.parent_host_id).map(h => ({ key: `host:${h.id}`, label: `Host: ${h.fqdn}`, fqdn: h.fqdn })),
+  ];
   const BASE = 'rslvd.privatedns.org';
 
-  const selectedParent = topLevelTunnels.find(t => t.id === parentId);
+  const selectedParent = parentOptions.find(p => p.key === parentId);
   const fqdnPreview = name
     ? (isNested && selectedParent ? `${name}.${selectedParent.fqdn}` : `${name}.${BASE}`)
     : '';
@@ -738,7 +760,7 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
     e.preventDefault(); setError(''); setLoading(true);
     try {
       const body = { name: name.toLowerCase(), target_port: parseInt(targetPort), protocol };
-      if (isNested && parentId) body.parent_id = parentId;
+      if (isNested && parentId) { const [kind, id] = parentId.split(':'); body.parent_id = id; body.parent_kind = kind; }
       const t = await API.post('/tunnels', body);
       onCreated(t);
     } catch (err) { setError(err.message); }
@@ -766,7 +788,7 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels }) {
           className: 'input', value: parentId, onChange: e => setParentId(e.target.value), required: true
         },
           React.createElement('option', { value: '' }, '— select a parent tunnel —'),
-          topLevelTunnels.map(t => React.createElement('option', { key: t.id, value: t.id }, t.fqdn))
+          parentOptions.map(p => React.createElement('option', { key: p.key, value: p.key }, p.label))
         )
       ),
 
@@ -1089,21 +1111,24 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
 }
 
 // ── Add Host Modal ──────────────────────────────────────────────────────────────
-function AddHostModal({ onClose, onCreated, user, existingHosts }) {
+function AddHostModal({ onClose, onCreated, user, existingHosts, existingTunnels }) {
   const [hostname, setHostname] = useState('');
   const [mode, setMode] = useState('top');        // 'top' | 'nested'
   const [parentId, setParentId] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const canNest = user?.plan === 'annual' || user?.role === 'site_owner';
+  const canNest = hasRemoteAccess(user);
   // Only top-level hosts can be parents
-  const topLevelHosts = (existingHosts || []).filter(h => !h.parent_host_id);
+  const parentOptions = [
+    ...(existingHosts || []).filter(h => !h.parent_host_id).map(h => ({ key: `host:${h.id}`, label: `Host: ${h.fqdn}`, fqdn: h.fqdn })),
+    ...(existingTunnels || []).filter(t => !t.parent_tunnel_id).map(t => ({ key: `tunnel:${t.id}`, label: `Tunnel: ${t.fqdn}`, fqdn: t.fqdn })),
+  ];
 
   const preview = () => {
     if (!hostname) return '';
     if (mode === 'nested' && parentId) {
-      const parent = topLevelHosts.find(h => h.id === parentId);
+      const parent = parentOptions.find(p => p.key === parentId);
       return parent ? `${hostname}.${parent.fqdn}` : `${hostname}.<parent>.rslvd.privatedns.org`;
     }
     return `${hostname}.rslvd.privatedns.org`;
@@ -1113,7 +1138,7 @@ function AddHostModal({ onClose, onCreated, user, existingHosts }) {
     e.preventDefault(); setError(''); setLoading(true);
     try {
       const body = { hostname: hostname.toLowerCase() };
-      if (mode === 'nested' && parentId) body.parent_id = parentId;
+      if (mode === 'nested' && parentId) { const [kind, id] = parentId.split(':'); body.parent_id = id; body.parent_kind = kind; }
       const h = await API.post('/hosts', body);
       onCreated(h);
     } catch (err) { setError(err.message); }
@@ -1142,7 +1167,7 @@ function AddHostModal({ onClose, onCreated, user, existingHosts }) {
           ? React.createElement(Alert, { type: 'info' }, 'Create a top-level host first, then add nested ones under it.')
           : React.createElement('select', { className: 'input', value: parentId, onChange: e => setParentId(e.target.value), required: true },
               React.createElement('option', { value: '' }, 'Select a parent...'),
-              topLevelHosts.map(h => React.createElement('option', { key: h.id, value: h.id }, h.fqdn))
+              parentOptions.map(p => React.createElement('option', { key: p.key, value: p.key }, p.label))
             )
       ),
 
@@ -1407,18 +1432,12 @@ function DnsChangeLog({ hosts, tunnels }) {
 function Dashboard({ user, navigate, refreshUser, pwa }) {
   const [hosts, setHosts] = useState([]);
   const [tunnels, setTunnels] = useState([]);
-  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('hosts');
   const [showAddHost, setShowAddHost] = useState(false);
   const [showAddTunnel, setShowAddTunnel] = useState(false);
   const [msg, setMsg] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [subscription, setSubscription] = useState(null);
-  const [subLoading, setSubLoading] = useState(false);
-  const [cancelLoading, setCancelLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [showUpdatePM, setShowUpdatePM] = useState(false);
   const [showDonate, setShowDonate] = useState(false);
   const [donateAmount, setDonateAmount] = useState('5.00');
   const sqCardRef = useRef(null);
@@ -1427,15 +1446,15 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
-      setMsg('Payment successful! Your subscription is now active.');
+      setMsg('Payment successful! Thank you for supporting rslvd.');
       setTimeout(() => refreshUser(), 2000);
       window.history.replaceState({}, '', '/dashboard');
     }
   }, []);
 
   useEffect(() => {
-    Promise.all([API.get('/hosts'), API.get('/tunnels'), API.get('/billing/plans')])
-      .then(([h, t, p]) => { setHosts(h); setTunnels(t); setPlans(p); })
+    Promise.all([API.get('/hosts'), API.get('/tunnels')])
+      .then(([h, t]) => { setHosts(h); setTunnels(t); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -1447,17 +1466,6 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
   const onTunnelCreated = t => { setTunnels(x => [t, ...x]); setShowAddTunnel(false); };
   const onTunnelDeleted = id => setTunnels(x => x.filter(t => t.id !== id));
   const onTunnelHttpsToggle = (id, val) => setTunnels(x => x.map(t => t.id === id ? { ...t, force_https: val } : t));
-
-  const loadSubscription = async () => {
-    setSubLoading(true);
-    try { const s = await API.get('/billing/subscription'); setSubscription(s); }
-    catch (e) { setSubscription(null); }
-    finally { setSubLoading(false); }
-  };
-
-  useEffect(() => {
-    if (tab === 'billing' && (user.status === 'active' || user.status === 'cancelling')) loadSubscription();
-  }, [tab]);
 
   const loadSquareSdk = (environment) => new Promise((resolve, reject) => {
     if (window.Square) return resolve();
@@ -1492,18 +1500,6 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
   };
 
   useEffect(() => {
-    if (selectedPlan) initCard('sq-card-subscribe');
-    else teardownCard();
-    return () => teardownCard();
-  }, [selectedPlan]);
-
-  useEffect(() => {
-    if (showUpdatePM) initCard('sq-card-update');
-    else teardownCard();
-    return () => teardownCard();
-  }, [showUpdatePM]);
-
-  useEffect(() => {
     if (showDonate) initCard('sq-card-donate');
     else teardownCard();
     return () => teardownCard();
@@ -1518,20 +1514,6 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
     return result.token;
   };
 
-  const handleSubscribe = async () => {
-    if (!sqCardRef.current) return;
-    setPaymentLoading(true);
-    try {
-      const sourceId = await tokenizeCard();
-      await API.post('/billing/subscribe', { plan: selectedPlan, sourceId });
-      setMsg('Subscription activated!');
-      setSelectedPlan(null);
-      teardownCard();
-      setTimeout(() => refreshUser(), 1500);
-    } catch (e) { alert(e.message || 'Payment failed'); }
-    finally { setPaymentLoading(false); }
-  };
-
   const handleDonate = async () => {
     if (!sqCardRef.current) return;
     const cents = Math.round(parseFloat(donateAmount) * 100);
@@ -1541,7 +1523,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
     try {
       const sourceId = await tokenizeCard();
       const r = await API.post('/billing/donate', { amountCents: cents, sourceId });
-      setMsg(`Thank you for supporting rslvd! You now have +${r.bonusHosts} bonus hostname${r.bonusHosts === 1 ? '' : 's'} and +${r.bonusTunnels} bonus tunnel${r.bonusTunnels === 1 ? '' : 's'} until ${new Date(r.bonusExpiresAt).toLocaleDateString()}.`);
+      setMsg(`Thank you for supporting rslvd! Donor access runs until ${new Date(r.donorExpiresAt).toLocaleDateString()}.`);
       setShowDonate(false);
       teardownCard();
       setTimeout(() => refreshUser(), 1500);
@@ -1549,39 +1531,10 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
     finally { setPaymentLoading(false); }
   };
 
-  const handleCancel = async () => {
-    if (!confirm('Cancel your subscription? Your plan will remain active until the end of your current billing period.')) return;
-    setCancelLoading(true);
-    try {
-      await API.post('/billing/cancel');
-      setMsg('Subscription cancelled. Your plan remains active until your billing period ends.');
-      loadSubscription();
-      setTimeout(() => refreshUser(), 1500);
-    } catch (e) { alert(e.message); }
-    finally { setCancelLoading(false); }
-  };
-
-  const handleUpdatePayment = async () => {
-    if (!sqCardRef.current) return;
-    setPaymentLoading(true);
-    try {
-      const sourceId = await tokenizeCard();
-      await API.post('/billing/update-payment', { sourceId });
-      setMsg('Payment method updated!');
-      setShowUpdatePM(false);
-      teardownCard();
-      loadSubscription();
-    } catch (e) { alert(e.message); }
-    finally { setPaymentLoading(false); }
-  };
-
-  const planLabel = { free: 'Free', monthly: 'Monthly', quarterly: 'Quarterly', semi_annual: '6 Months', annual: 'Annual', none: 'No plan' };
-  const statusColor = { active: 'green', cancelling: 'yellow', free: 'purple', past_due: 'yellow', inactive: 'gray' };
-
   if (loading) return React.createElement('div', { className: 'flex-center', style: { minHeight: 400 } }, React.createElement(Spinner));
 
-  const isPaidActive = user.status === 'active' || user.status === 'cancelling';
-  const isFree = user.plan === 'free' || user.status === 'free';
+  const isDonor = user.plan === 'donor';
+  const isFree = !isDonor;
   const canAddHost = hosts.length < (user.maxHosts || 2);
   const canAddTunnel = tunnels.length < (user.maxTunnels || 2);
 
@@ -1595,8 +1548,8 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, user.email)
       ),
       React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
-        React.createElement('span', { className: `badge badge-${statusColor[user.status] || 'gray'}` },
-          planLabel[user.plan] || user.plan
+        React.createElement('span', { className: `badge badge-${isDonor ? 'green' : 'gray'}` },
+          user.isSiteOwner ? 'Site Owner' : (isDonor ? 'Donor' : 'Free')
         ),
         user.supporter && React.createElement('span', { className: 'badge badge-purple' }, '💜 Supporter'),
         user.role === 'site_owner' && React.createElement('span', { className: 'badge badge-yellow' }, '★ Site Owner'),
@@ -1634,7 +1587,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         canAddHost && React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setShowAddHost(true) }, '+ Add hostname')
       ),
       isFree && React.createElement(Alert, { type: 'info' },
-        '🎁 Free plan: 2 subdomains + 2 tunnels included. Upgrade for more. ',
+        '🎁 Free plan: 2 subdomains + 2 tunnels included. Donate for unlimited access. ',
         React.createElement('a', { href: '/tutorials/linux-subdomain', onClick: e => { e.preventDefault(); navigate('/tutorials/linux-subdomain'); }, style: { color: 'var(--accent2)', fontWeight: 600 } }, '🐧 Linux tutorial'),
         ' · ',
         React.createElement('a', { href: '/tutorials/windows-subdomain', onClick: e => { e.preventDefault(); navigate('/tutorials/windows-subdomain'); }, style: { color: 'var(--accent2)', fontWeight: 600 } }, '🪟 Windows tutorial')
@@ -1648,17 +1601,16 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         )
         : (() => {
             const topLevel = hosts.filter(h => !h.parent_host_id);
-            const children = hosts.filter(h => !!h.parent_host_id);
             return topLevel.flatMap(h => [
               React.createElement(HostCard, { key: h.id, host: h, onDelete: onHostDeleted, onRegenKey, onHttpsToggle: onHostHttpsToggle, onIpUpdated: onHostIpUpdated, isNested: false }),
-              ...children.filter(c => c.parent_host_id === h.id).map(c =>
+              ...hosts.filter(c => c.parent_host_id === h.id).map(c =>
                 React.createElement(HostCard, { key: c.id, host: c, onDelete: onHostDeleted, onRegenKey, onHttpsToggle: onHostHttpsToggle, onIpUpdated: onHostIpUpdated, isNested: true })
               )
             ]);
           })(),
       !canAddHost && hosts.length > 0 && React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 24, marginTop: 12 } },
-        React.createElement('p', { style: { color: 'var(--text2)', marginBottom: 12 } }, `Hostname limit reached (${user.maxHosts >= 999999 ? 'Unlimited' : user.maxHosts}). Upgrade for more.`),
-        React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setTab('billing') }, 'Upgrade')
+        React.createElement('p', { style: { color: 'var(--text2)', marginBottom: 12 } }, `Hostname limit reached (${user.maxHosts >= 999999 ? 'Unlimited' : user.maxHosts}). Donate for unlimited access.`),
+        React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setTab('billing') }, 'Donate')
       ),
       hosts.length > 0 && React.createElement(DDNSAutoUpdater, { hosts })
     ),
@@ -1687,7 +1639,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
           React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, margin: 0 } },
             hasRemoteAccess(user)
               ? 'Create an SSH or ADB tunnel and it gets a real public port on rslvd.net (20000-29999): connect with "ssh -p <port> <user>@rslvd.net" or "adb connect rslvd.net:<port>".'
-              : 'SSH and ADB tunnels publish a real public port on rslvd.net so you can reach a machine — or a phone — behind CGNAT from anywhere. Included in every paid plan.'
+              : 'SSH and ADB tunnels publish a real public port on rslvd.net so you can reach a machine — or a phone — behind CGNAT from anywhere. Included with donor access.'
           ),
           !hasRemoteAccess(user) && React.createElement('button', {
             className: 'btn btn-primary btn-sm', style: { marginTop: 10 }, onClick: () => setTab('billing')
@@ -1703,17 +1655,16 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         )
         : (() => {
             const topLevel = tunnels.filter(t => !t.parent_tunnel_id);
-            const children = tunnels.filter(t => !!t.parent_tunnel_id);
             return topLevel.flatMap(t => [
               React.createElement(TunnelRow, { key: t.id, tunnel: t, onDelete: onTunnelDeleted, onHttpsToggle: onTunnelHttpsToggle, isNested: false }),
-              ...children.filter(c => c.parent_tunnel_id === t.id).map(c =>
+              ...tunnels.filter(c => c.parent_tunnel_id === t.id).map(c =>
                 React.createElement(TunnelRow, { key: c.id, tunnel: c, onDelete: onTunnelDeleted, onHttpsToggle: onTunnelHttpsToggle, isNested: true })
               )
             ]);
           })(),
       !canAddTunnel && tunnels.length > 0 && React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 24, marginTop: 12 } },
-        React.createElement('p', { style: { color: 'var(--text2)', marginBottom: 12 } }, `Tunnel limit reached (${user.maxTunnels >= 999999 ? 'Unlimited' : user.maxTunnels}). Upgrade for more.`),
-        React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setTab('billing') }, 'Upgrade')
+        React.createElement('p', { style: { color: 'var(--text2)', marginBottom: 12 } }, `Tunnel limit reached (${user.maxTunnels >= 999999 ? 'Unlimited' : user.maxTunnels}). Donate for unlimited access.`),
+        React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setTab('billing') }, 'Donate')
       )
     ),
 
@@ -1728,8 +1679,11 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
             React.createElement('div', { style: { fontSize: 24 } }, '💜'),
             React.createElement('div', null,
               React.createElement('h3', { style: { marginBottom: 4 } }, 'Support rslvd'),
-              React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, 'Donate any amount — every 50¢ gives you +1 bonus hostname and +1 bonus tunnel for 30 days, plus a Supporter badge.'),
-              user.bonusExpiresAt && React.createElement('p', { style: { color: 'var(--accent2)', fontSize: 13, marginTop: 4, fontWeight: 600 } }, `Active bonus: +${user.bonusHosts} hostnames · +${user.bonusTunnels} tunnels until ${new Date(user.bonusExpiresAt).toLocaleDateString()}`)
+              React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, 'Donations are the only way to unlock donor access. Our goal is $22.50 a month to keep rslvd running. Every $22.50 gives you 30 days of donor access.'),
+              React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, marginTop: 4 } }, 'Donor access: unlimited hostnames and tunnels, SSH and ADB tunnels, and nested subdomains & tunnels.'),
+              user.isSiteOwner
+                ? React.createElement('p', { style: { color: 'var(--accent2)', fontSize: 13, marginTop: 4, fontWeight: 600 } }, 'Site owner: unlimited access, no donation needed.')
+                : isDonor && React.createElement('p', { style: { color: 'var(--accent2)', fontSize: 13, marginTop: 4, fontWeight: 600 } }, 'Donor access active until ' + new Date(user.donorExpiresAt).toLocaleDateString())
             )
           ),
           React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setShowDonate(!showDonate) }, showDonate ? 'Cancel' : 'Donate')
@@ -1743,8 +1697,8 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
           }),
           (() => {
             const cents = Math.round(parseFloat(donateAmount) * 100);
-            const slots = Number.isFinite(cents) && cents >= 50 ? Math.min(Math.floor(cents / 50), 100) : 0;
-            return slots > 0 && React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, marginBottom: 12 } }, `You'll get +${slots} bonus hostname${slots === 1 ? '' : 's'} and +${slots} bonus tunnel${slots === 1 ? '' : 's'} for 30 days`);
+            const days = Number.isFinite(cents) && cents >= 50 ? Math.max(1, Math.round(cents / 2250 * 30)) : 0;
+            return days > 0 && React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, marginBottom: 12 } }, 'You\'ll get ' + days + ' day' + (days === 1 ? '' : 's') + ' of donor access');
           })(),
           React.createElement('div', { id: 'sq-card-donate' }),
           React.createElement('button', { className: 'btn btn-primary', style: { marginTop: 12 }, onClick: handleDonate, disabled: paymentLoading },
@@ -1752,76 +1706,19 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
           )
         )
       ),
-      isPaidActive
-        ? React.createElement('div', null,
-          React.createElement('div', { className: 'card mb-4' },
-            React.createElement('div', { className: 'flex-between' },
-              React.createElement('div', null,
-                React.createElement('h3', { style: { marginBottom: 4 } }, `${planLabel[user.plan]} plan`),
-                React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, `${user.maxHosts >= 999999 ? 'Unlimited' : user.maxHosts} hostnames · ${user.maxTunnels >= 999999 ? 'Unlimited' : user.maxTunnels} tunnels`),
-                user.status === 'cancelling'
-                  ? React.createElement('p', { style: { color: 'var(--yellow)', fontSize: 13, marginTop: 4, fontWeight: 600 } }, `Cancelling — active until ${subscription && subscription.paidThroughDate ? new Date(subscription.paidThroughDate).toLocaleDateString() : (user.planExpiresAt ? new Date(user.planExpiresAt).toLocaleDateString() : 'end of billing period')}`)
-                  : subscription && subscription.paidThroughDate && React.createElement('p', { style: { color: 'var(--text3)', fontSize: 13, marginTop: 4 } }, `Paid through ${new Date(subscription.paidThroughDate).toLocaleDateString()}`),
-                subscription && subscription.paymentMethod && React.createElement('p', { style: { color: 'var(--text3)', fontSize: 13, marginTop: 4 } }, `${subscription.paymentMethod.type} ending in ${subscription.paymentMethod.last4} · Exp ${subscription.paymentMethod.expirationMonth}/${subscription.paymentMethod.expirationYear}`)
-              ),
-              React.createElement('div', { style: { display: 'flex', gap: 8, flexDirection: 'column' } },
-                user.status !== 'cancelling' && React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: () => setShowUpdatePM(!showUpdatePM) }, showUpdatePM ? 'Cancel' : 'Update payment'),
-                user.status !== 'cancelling' && React.createElement('button', { className: 'btn btn-sm', style: { background: 'var(--bg3)', color: 'var(--text2)', border: '1px solid var(--border)' }, onClick: handleCancel, disabled: cancelLoading },
-                  cancelLoading ? React.createElement(Spinner) : 'Cancel subscription'
-                )
-              )
-            )
-          ),
-          showUpdatePM && React.createElement('div', { className: 'card mb-4' },
-            React.createElement('h3', { style: { marginBottom: 12 } }, 'Update Payment Method'),
-            React.createElement('div', { id: 'sq-card-update' }),
-            React.createElement('button', { className: 'btn btn-primary', style: { marginTop: 12 }, onClick: handleUpdatePayment, disabled: paymentLoading },
-              paymentLoading ? React.createElement(Spinner) : 'Update'
-            )
-          ),
-          subLoading && React.createElement('div', { className: 'flex-center', style: { padding: 24 } }, React.createElement(Spinner))
-        )
-        : React.createElement('div', null,
-          React.createElement('div', { className: 'card mb-4', style: { borderColor: 'var(--border2)' } },
-            React.createElement('div', { style: { display: 'flex', gap: 12, alignItems: 'flex-start' } },
-              React.createElement('div', { style: { fontSize: 24 } }, '🎁'),
-              React.createElement('div', null,
-                React.createElement('h3', { style: { marginBottom: 4 } }, 'Current: Free Plan'),
-                React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, '2 hostnames · 2 tunnels · always free')
-              )
-            )
-          ),
-          React.createElement('h2', { className: 'section-title' }, 'Upgrade for more'),
-          React.createElement('div', { className: 'pricing-grid' },
-            plans.map(p => React.createElement('div', { key: p.key, className: `pricing-card${selectedPlan === p.key ? ' selected' : ''}`, style: selectedPlan === p.key ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 2px var(--accent)' } : {} },
-              React.createElement('h3', { style: { color: 'var(--text2)', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 } }, p.label),
-              React.createElement('div', { className: 'price-amount' }, p.amount.split('/')[0]),
-              React.createElement('div', { className: 'price-period' }, '/' + p.amount.split('/')[1]),
-              React.createElement('ul', { className: 'price-features' },
-                React.createElement('li', null, `${p.maxHosts >= 999999 ? 'Unlimited' : p.maxHosts} hostnames`),
-                React.createElement('li', null, `${p.maxTunnels >= 999999 ? 'Unlimited' : p.maxTunnels} tunnels`),
-                React.createElement('li', null, 'IPv4 + IPv6'),
-                p.key === 'annual' && React.createElement('li', { style: { color: 'var(--accent2)', fontWeight: 600 } }, 'Nested subdomains & tunnels'),
-              ),
-              React.createElement('button', {
-                className: selectedPlan === p.key ? 'btn btn-secondary w-full' : 'btn btn-primary w-full',
-                onClick: () => setSelectedPlan(selectedPlan === p.key ? null : p.key),
-              }, selectedPlan === p.key ? 'Cancel' : 'Select')
-            ))
-          ),
-          selectedPlan && React.createElement('div', { className: 'card', style: { marginTop: 16 } },
-            React.createElement('h3', { style: { marginBottom: 4 } }, `Subscribe to ${planLabel[selectedPlan]}`),
-            React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 16 } }, `${plans.find(p => p.key === selectedPlan)?.amount || ''} · Cancel anytime`),
-            React.createElement('div', { id: 'sq-card-subscribe' }),
-            React.createElement('button', { className: 'btn btn-primary w-full', style: { marginTop: 12 }, onClick: handleSubscribe, disabled: paymentLoading },
-              paymentLoading ? React.createElement(Spinner) : 'Pay & Subscribe'
-            )
+      !isDonor && React.createElement('div', { className: 'card mb-4', style: { borderColor: 'var(--border2)' } },
+        React.createElement('div', { style: { display: 'flex', gap: 12, alignItems: 'flex-start' } },
+          React.createElement('div', { style: { fontSize: 24 } }, '🎁'),
+          React.createElement('div', null,
+            React.createElement('h3', { style: { marginBottom: 4 } }, 'Current: Free'),
+            React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, '2 hostnames · 2 tunnels · no SSH or ADB tunnels · no nesting')
           )
         )
+      )
     ),
 
-    showAddHost && React.createElement(AddHostModal, { onClose: () => setShowAddHost(false), onCreated: onHostCreated, user, existingHosts: hosts }),
-    showAddTunnel && React.createElement(TunnelModal, { onClose: () => setShowAddTunnel(false), onCreated: onTunnelCreated, user, existingTunnels: tunnels })
+    showAddHost && React.createElement(AddHostModal, { onClose: () => setShowAddHost(false), onCreated: onHostCreated, user, existingHosts: hosts, existingTunnels: tunnels }),
+    showAddTunnel && React.createElement(TunnelModal, { onClose: () => setShowAddTunnel(false), onCreated: onTunnelCreated, user, existingTunnels: tunnels, existingHosts: hosts })
   );
 }
 
@@ -1905,7 +1802,7 @@ function AdminDashboard({ user, navigate }) {
       ),
       React.createElement('div', { className: 'stat-card' },
         React.createElement('div', { className: 'stat-value', style: { color: 'var(--green)' } }, stats.activeSubscribers),
-        React.createElement('div', { className: 'stat-label' }, 'Paid subscribers')
+        React.createElement('div', { className: 'stat-label' }, 'Active donors')
       )
     ),
 
@@ -1926,11 +1823,11 @@ function AdminDashboard({ user, navigate }) {
     tab === 'overview' && stats && React.createElement('div', null,
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 } },
         React.createElement('div', { className: 'card' },
-          React.createElement('h3', { style: { marginBottom: 16 } }, 'Users by plan'),
+          React.createElement('h3', { style: { marginBottom: 16 } }, 'Donors vs free'),
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-            stats.byPlan.map(p => React.createElement('div', { key: p.plan, className: 'flex-between', style: { fontSize: 14 } },
-              React.createElement('span', { style: { color: 'var(--text2)' } }, p.plan || 'none'),
-              React.createElement('span', { style: { fontWeight: 600 } }, p.count)
+            [['donor', stats.byPlan?.[0]?.donors ?? 0], ['free', stats.byPlan?.[0]?.free ?? 0]].map(([k, v]) => React.createElement('div', { key: k, className: 'flex-between', style: { fontSize: 14 } },
+              React.createElement('span', { style: { color: 'var(--text2)' } }, k),
+              React.createElement('span', { style: { fontWeight: 600 } }, v)
             ))
           )
         ),
@@ -1940,7 +1837,7 @@ function AdminDashboard({ user, navigate }) {
             stats.recentUsers.map(u => React.createElement('div', { key: u.id, style: { fontSize: 13 } },
               React.createElement('div', { style: { fontWeight: 500 } }, u.email),
               React.createElement('div', { style: { color: 'var(--text3)', fontSize: 12 } },
-                `${u.plan} · ${new Date(u.created_at).toLocaleDateString()}`
+                `${u.bonus_expires_at && new Date(u.bonus_expires_at) > new Date() ? 'donor' : 'free'} · ${new Date(u.created_at).toLocaleDateString()}`
               )
             ))
           )
@@ -1959,8 +1856,7 @@ function AdminDashboard({ user, navigate }) {
           React.createElement('thead', null,
             React.createElement('tr', null,
               React.createElement('th', null, 'Email'),
-              React.createElement('th', null, 'Plan'),
-              React.createElement('th', null, 'Status'),
+              React.createElement('th', null, 'Donor until'),
               React.createElement('th', null, 'Limits'),
               React.createElement('th', null, 'Role'),
               React.createElement('th', null, 'Joined'),
@@ -1970,9 +1866,8 @@ function AdminDashboard({ user, navigate }) {
           React.createElement('tbody', null,
             filteredUsers.map(u => React.createElement('tr', { key: u.id },
               React.createElement('td', null, React.createElement('span', { style: { fontWeight: 500, fontSize: 13 } }, u.email)),
-              React.createElement('td', null, React.createElement('span', { className: 'badge badge-purple' }, u.plan)),
-              React.createElement('td', null, React.createElement('span', { className: `badge badge-${u.subscription_status === 'active' ? 'green' : u.subscription_status === 'free' ? 'purple' : 'gray'}` }, u.subscription_status)),
-              React.createElement('td', null, React.createElement('span', { style: { fontSize: 12, color: 'var(--text2)' } }, `${u.max_hosts}h / ${u.max_tunnels}t`)),
+              React.createElement('td', null, React.createElement('span', { className: `badge badge-${u.bonus_expires_at && new Date(u.bonus_expires_at) > new Date() ? 'green' : 'gray'}` }, u.bonus_expires_at && new Date(u.bonus_expires_at) > new Date() ? new Date(u.bonus_expires_at).toLocaleDateString() : 'free')),
+              React.createElement('td', null, React.createElement('span', { style: { fontSize: 12, color: 'var(--text2)' } }, u.bonus_expires_at && new Date(u.bonus_expires_at) > new Date() ? 'Unlimited' : '2h / 2t')),
               React.createElement('td', null,
                 u.is_site_owner ? React.createElement('span', { className: 'badge badge-yellow' }, '★ Owner')
                   : u.is_admin ? React.createElement('span', { className: 'badge badge-purple' }, 'Admin')
@@ -2346,10 +2241,7 @@ function BackupPanel() {
 
 // ── Edit User Modal ───────────────────────────────────────────────────────────
 function EditUserModal({ user: u, isSiteOwner, onClose, onSaved }) {
-  const [plan, setPlan] = useState(u.plan);
-  const [maxHosts, setMaxHosts] = useState(u.max_hosts);
-  const [maxTunnels, setMaxTunnels] = useState(u.max_tunnels);
-  const [status, setStatus] = useState(u.subscription_status);
+  const [donorExpiresAt, setDonorExpiresAt] = useState(u.bonus_expires_at ? new Date(u.bonus_expires_at).toISOString().slice(0, 10) : '');
   const [isAdmin, setIsAdmin] = useState(u.is_admin);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -2357,10 +2249,10 @@ function EditUserModal({ user: u, isSiteOwner, onClose, onSaved }) {
   const save = async () => {
     setLoading(true); setError('');
     try {
-      const body = { plan, maxHosts: parseInt(maxHosts), maxTunnels: parseInt(maxTunnels), subscriptionStatus: status };
+      const body = { donorExpiresAt: donorExpiresAt ? new Date(donorExpiresAt + 'T23:59:59Z').toISOString() : null };
       if (isSiteOwner) body.isAdmin = isAdmin;
       await API.patch(`/admin/users/${u.id}`, body);
-      onSaved({ ...u, plan, max_hosts: parseInt(maxHosts), max_tunnels: parseInt(maxTunnels), subscription_status: status, is_admin: isAdmin });
+      onSaved({ ...u, bonus_expires_at: body.donorExpiresAt, is_admin: isAdmin });
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -2369,30 +2261,8 @@ function EditUserModal({ user: u, isSiteOwner, onClose, onSaved }) {
     error && React.createElement(Alert, null, error),
     React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } },
       React.createElement('div', { className: 'form-group' },
-        React.createElement('label', { className: 'form-label' }, 'Plan'),
-        React.createElement('select', { className: 'input', value: plan, onChange: e => setPlan(e.target.value) },
-          ['free', 'monthly', 'quarterly', 'semi_annual', 'annual', 'none'].map(p =>
-            React.createElement('option', { key: p, value: p }, p)
-          )
-        )
-      ),
-      React.createElement('div', { className: 'form-group' },
-        React.createElement('label', { className: 'form-label' }, 'Subscription status'),
-        React.createElement('select', { className: 'input', value: status, onChange: e => setStatus(e.target.value) },
-          ['free', 'active', 'inactive', 'past_due', 'cancelled'].map(s =>
-            React.createElement('option', { key: s, value: s }, s)
-          )
-        )
-      ),
-      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 } },
-        React.createElement('div', { className: 'form-group' },
-          React.createElement('label', { className: 'form-label' }, 'Max hostnames'),
-          React.createElement('input', { className: 'input', type: 'number', value: maxHosts, onChange: e => setMaxHosts(e.target.value), min: 0, max: 1000 })
-        ),
-        React.createElement('div', { className: 'form-group' },
-          React.createElement('label', { className: 'form-label' }, 'Max tunnels'),
-          React.createElement('input', { className: 'input', type: 'number', value: maxTunnels, onChange: e => setMaxTunnels(e.target.value), min: 0, max: 1000 })
-        )
+        React.createElement('label', { className: 'form-label' }, 'Donor access until (blank = free)'),
+        React.createElement('input', { className: 'input', type: 'date', value: donorExpiresAt, onChange: e => setDonorExpiresAt(e.target.value) })
       ),
       isSiteOwner && React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
         React.createElement('input', { type: 'checkbox', id: 'isAdmin', checked: isAdmin, onChange: e => setIsAdmin(e.target.checked), style: { width: 16, height: 16 } }),
@@ -2458,7 +2328,7 @@ function DeleteAccountTab({ user, navigate, logout }) {
     React.createElement('div', { className: 'card', style: { border: '1px solid var(--danger, #e5484d)' } },
       React.createElement('h3', { style: { marginBottom: 8, color: 'var(--danger, #e5484d)' } }, 'Delete account'),
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 16 } },
-        'This permanently deletes your account and all of your hostnames and tunnels. Any active subscription is cancelled. This cannot be undone.'),
+        'This permanently deletes your account and all of your hostnames and tunnels. Any donor access is forfeited. This cannot be undone.'),
       isOwner
         ? React.createElement(Alert, null, 'Site owner accounts cannot be deleted here.')
         : React.createElement('form', { onSubmit: submit },
@@ -2514,7 +2384,7 @@ function ProfileTab({ user, refreshUser }) {
     React.createElement('div', { className: 'card' },
       React.createElement('h3', { style: { marginBottom: 12 } }, 'Account info'),
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
-        [['Plan', user.plan], ['Status', user.status], ['Hostnames', user.maxHosts >= 999999 ? 'Unlimited' : user.maxHosts], ['Tunnels', user.maxTunnels >= 999999 ? 'Unlimited' : user.maxTunnels], ['Role', user.role]].map(([k, v]) =>
+        [['Plan', user.plan === 'donor' ? 'Donor' : 'Free'], ['Donor until', user.donorExpiresAt ? new Date(user.donorExpiresAt).toLocaleDateString() : '—'], ['Hostnames', user.maxHosts >= 999999 ? 'Unlimited' : user.maxHosts], ['Tunnels', user.maxTunnels >= 999999 ? 'Unlimited' : user.maxTunnels], ['Role', user.role]].map(([k, v]) =>
           React.createElement('div', { key: k, className: 'flex-between', style: { fontSize: 14 } },
             React.createElement('span', { style: { color: 'var(--text2)' } }, k),
             React.createElement('span', { style: { fontWeight: 500 } }, String(v))
@@ -2765,7 +2635,7 @@ function TermsPage({ navigate }) {
     ),
 
     React.createElement(Section, { title: '6. Billing and Refunds' },
-      React.createElement(P, null, 'Paid plans are billed in advance through Square. All charges are non-refundable except where required by applicable law. Downgrading or cancelling a plan takes effect at the end of the current billing period. We reserve the right to change pricing with 30 days notice.')
+      React.createElement(P, null, 'Donations are voluntary, one-time payments processed through Square and are non-refundable except where required by applicable law. Donor access lasts for the period the donation covers and is not recurring. We reserve the right to change the donation goal and donor benefits with reasonable notice.')
     ),
 
     React.createElement(Section, { title: '7. Intellectual Property' },
@@ -3773,7 +3643,7 @@ function App() {
     path === '/tutorials/windows-tunnel' && React.createElement(TutorialWindowsTunnel, { navigate }),
     path === '/verify-email' && React.createElement(VerifyEmailPage, { navigate }),
     path === '/downloads' && React.createElement(DownloadsPage, { navigate }),
-    !['/', '/login', '/register', '/dashboard', '/admin', '/pricing', '/account', '/terms', '/privacy', '/forgot-password', '/reset-password', '/tutorials', '/tutorials/linux-subdomain', '/tutorials/windows-subdomain', '/tutorials/linux-tunnel', '/tutorials/windows-tunnel', '/verify-email', '/downloads'].includes(path) &&
+    !['/', '/login', '/register', '/dashboard', '/admin', '/pricing', '/account', '/terms', '/privacy', '/forgot-password', '/reset-password', '/tutorials', '/tutorials/linux-subdomain', '/tutorials/windows-subdomain', '/tutorials/linux-tunnel', '/tutorials/windows-tunnel', '/verify-email', '/downloads', '/support'].includes(path) &&
       React.createElement('div', { className: 'flex-center', style: { minHeight: 400, flexDirection: 'column', gap: 16 } },
         React.createElement('h1', null, '404'),
         React.createElement('p', { style: { color: 'var(--text2)' } }, 'Page not found'),

@@ -1,56 +1,61 @@
-// Paid plan definitions. Amounts are in USD cents; period is in days.
-const PLANS = {
-  monthly:     { label: 'Monthly',   amount: '$0.99/mo',  amountCents: 99,  periodDays: 30,  maxHosts: 4,      maxTunnels: 4 },
-  quarterly:   { label: 'Quarterly', amount: '$1.99/3mo', amountCents: 199, periodDays: 91,  maxHosts: 12,     maxTunnels: 12 },
-  semi_annual: { label: '6 Months',  amount: '$4.99/6mo', amountCents: 499, periodDays: 182, maxHosts: 24,     maxTunnels: 24 },
-  annual:      { label: 'Annual',    amount: '$8.99/yr',  amountCents: 899, periodDays: 365, maxHosts: 999999, maxTunnels: 999999 },
-};
-
-// Pay-what-you-want donations. Every DONATION.centsPerSlot grants +1 bonus
-// hostname slot and +1 bonus tunnel slot for DONATION.periodDays.
+// Donation-only model. There are no subscriptions. Donating grants donor access
+// for a period proportional to the amount: GOAL_CENTS pays for MONTH_DAYS.
 const DONATION = {
   minCents: 50,
   maxCents: 20000,
-  centsPerSlot: 50,
-  periodDays: 30,
-  maxBonusSlots: 100,
+  goalCents: 2250,
+  monthDays: 30,
 };
 
-// ── Remote access (premium) ──────────────────────────────────────────────────
+const FREE_LIMITS = { maxHosts: 2, maxTunnels: 2 };
+const UNLIMITED = 999999;
+
+// ── Remote access (donor) ────────────────────────────────────────────────────
 // Raw-port tunnels (SSH, ADB, …) publish a real TCP port on the server so
-// binary protocols work end-to-end. Any paid plan unlocks them.
-const PAID_PLAN_KEYS = ['monthly', 'quarterly', 'semi_annual', 'annual'];
+// binary protocols work end-to-end. Donors and the site owner only.
 const REMOTE_PROTOCOLS = ['ssh', 'adb'];
 
-/** Is this tunnel protocol a premium raw-port (SSH/ADB) tunnel? */
+/** Is this tunnel protocol a donor-only raw-port (SSH/ADB) tunnel? */
 function isRemoteProtocol(protocol) {
   return REMOTE_PROTOCOLS.includes(String(protocol || '').toLowerCase());
 }
 
-/**
- * Does this user have remote access (SSH/ADB over a public port)?
- * True for any active paid plan and for site owners/admins. Accepts either a
- * request user row or the joined { plan, plan_expires_at, … } shape.
- */
-function hasRemoteAccess(user) {
-  if (!user) return false;
-  if (user.is_site_owner || user.is_admin || user.role === 'site_owner' || user.role === 'admin') return true;
-  if (!PAID_PLAN_KEYS.includes(user.plan)) return false;
-  if (user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) return false;
-  return true;
+/** Is this user the site owner or an admin? Owners get donor privileges free. */
+function isOwner(user) {
+  return !!(user && (user.is_site_owner || user.is_admin || user.role === 'site_owner' || user.role === 'admin'));
 }
 
-/** Currently-active donation bonus slots for a user row (0 when expired). */
-function activeBonus(user) {
-  const active = user && user.bonus_expires_at && new Date(user.bonus_expires_at) > new Date();
-  return {
-    hosts: active ? (user.bonus_hosts || 0) : 0,
-    tunnels: active ? (user.bonus_tunnels || 0) : 0,
-    expiresAt: active ? user.bonus_expires_at : null,
-  };
+/** Does the user have an active donation window? */
+function isDonor(user) {
+  return !!(user && user.bonus_expires_at && new Date(user.bonus_expires_at) > new Date());
+}
+
+/** Does this user have remote access (SSH/ADB over a public port)? */
+function hasRemoteAccess(user) {
+  return isOwner(user) || isDonor(user);
+}
+
+/** Can this user nest tunnels/subdomains under others? Same as remote access. */
+function canNest(user) {
+  return hasRemoteAccess(user);
+}
+
+/** Hostname and tunnel limits for a user row. Donors and owners are unlimited. */
+function limitsFor(user) {
+  if (hasRemoteAccess(user)) return { hosts: UNLIMITED, tunnels: UNLIMITED };
+  return { hosts: FREE_LIMITS.maxHosts, tunnels: FREE_LIMITS.maxTunnels };
+}
+
+/**
+ * Days of donor access granted by a donation of `cents`:
+ * $22.50 = 30 days, pro-rated. Always at least one day.
+ */
+function donationDays(cents) {
+  return Math.max(1, Math.round((cents / DONATION.goalCents) * DONATION.monthDays));
 }
 
 module.exports = {
-  PLANS, DONATION, activeBonus,
-  PAID_PLAN_KEYS, REMOTE_PROTOCOLS, isRemoteProtocol, hasRemoteAccess,
+  DONATION, FREE_LIMITS, UNLIMITED,
+  REMOTE_PROTOCOLS, isRemoteProtocol,
+  isOwner, isDonor, hasRemoteAccess, canNest, limitsFor, donationDays,
 };

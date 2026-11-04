@@ -2,16 +2,10 @@ const crypto = require('crypto');
 const router = require('express').Router();
 const pool = require('../db/pool');
 const square = require('../lib/square');
-const { PLANS, DONATION } = require('../lib/plans');
+const { DONATION } = require('../lib/plans');
 const { requireAuth } = require('../middleware/auth');
 const payments = require('../lib/payments');
 const activity = require('../lib/activity');
-
-router.get('/plans', (req, res) => {
-  res.json(Object.entries(PLANS).map(([key, val]) => ({
-    key, label: val.label, amount: val.amount, maxHosts: val.maxHosts, maxTunnels: val.maxTunnels,
-  })));
-});
 
 function requireGateway(req, res, next) {
   if (!square.configured) return res.status(503).json({ error: 'Billing is not configured' });
@@ -22,6 +16,24 @@ function squareErrorMessage(err, fallback) {
   const first = err && err.errors && err.errors[0];
   return (first && (first.detail || first.code)) || fallback;
 }
+
+// Monthly donation goal shown on the landing page (public, no auth).
+router.get('/goal', async (req, res) => {
+  try {
+    const raisedCents = await payments.monthlyDonationCents();
+    const goalCents = DONATION.goalCents;
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({
+      goalCents,
+      raisedCents,
+      percent: Math.min(100, Math.round((raisedCents / goalCents) * 100)),
+      resetsAt: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1)).toISOString(),
+    });
+  } catch (err) {
+    console.error('Goal fetch error:', err);
+    res.status(500).json({ error: 'Failed to load goal' });
+  }
+});
 
 // Config for the Square Web Payments SDK on the frontend
 router.get('/config', requireAuth, requireGateway, (req, res) => {
@@ -56,39 +68,8 @@ async function storeCard(user, customerId, sourceId) {
   return card;
 }
 
-router.post('/subscribe', requireAuth, requireGateway, async (req, res) => {
-  try {
-    const { plan, sourceId } = req.body;
-    const planInfo = PLANS[plan];
-    if (!planInfo) return res.status(400).json({ error: 'Invalid plan' });
-    if (!sourceId) return res.status(400).json({ error: 'Payment method required' });
-
-    const user = req.user;
-    if (user.subscription_status === 'active' && user.plan !== 'free') {
-      return res.status(400).json({ error: 'You already have an active subscription. Cancel it first or contact support.' });
-    }
-
-    const customerId = await ensureCustomer(user);
-    const card = await storeCard(user, customerId, sourceId);
-
-    // Intent row + Square idempotency key make the charge crash-safe: if the
-    // process dies after the charge, reconciliation applies the paid plan.
-    const intent = await payments.createIntent({
-      userId: user.id, plan, kind: 'subscribe', amountCents: planInfo.amountCents,
-      customerId, cardId: card.id,
-    });
-    const payment = await payments.executeIntent(intent, `rslvd.privatedns.org ${planInfo.label} plan (${plan})`);
-    const expires = await payments.applyIntent(intent, payment);
-
-    res.json({ success: true, subscription: { id: payment.id, status: 'active', plan, paidThroughDate: expires } });
-  } catch (err) {
-    console.error('Subscribe error:', err);
-    res.status(400).json({ error: squareErrorMessage(err, 'Subscription failed') });
-  }
-});
-
-// Pay-what-you-want donation: every 50¢ grants +1 bonus hostname and +1 bonus
-// tunnel slot for 30 days (stacks with any plan, extends an active bonus).
+// Pay-what-you-want donation. $22.50 = 30 days of donor access, pro-rated for
+// smaller amounts. Donating extends an active donor window.
 router.post('/donate', requireAuth, requireGateway, async (req, res) => {
   try {
     const { amountCents, sourceId } = req.body;
@@ -110,60 +91,10 @@ router.post('/donate', requireAuth, requireGateway, async (req, res) => {
     const bonus = await payments.applyDonation(intent, payment);
 
     activity.log('user.donation', { userId: user.id, detail: `$${(cents / 100).toFixed(2)}`, req });
-    res.json({
-      success: true,
-      bonusHosts: bonus.hosts,
-      bonusTunnels: bonus.tunnels,
-      bonusExpiresAt: bonus.expires,
-    });
+    res.json({ success: true, donorExpiresAt: bonus.expires });
   } catch (err) {
     console.error('Donation error:', err);
     res.status(400).json({ error: squareErrorMessage(err, 'Donation failed') });
-  }
-});
-
-router.get('/subscription', requireAuth, requireGateway, async (req, res) => {
-  try {
-    const user = req.user;
-    if (user.plan === 'free' || user.subscription_status === 'inactive') return res.json({ status: 'none' });
-
-    let paymentMethod = null;
-    if (user.square_card_id) {
-      try {
-        const { card } = await square.client.cards.get({ cardId: user.square_card_id });
-        paymentMethod = { type: card.cardBrand || 'Card', last4: card.last4, expirationMonth: Number(card.expMonth), expirationYear: Number(card.expYear) };
-      } catch (_) {}
-    }
-
-    res.json({
-      status: user.subscription_status,
-      plan: user.plan,
-      paidThroughDate: user.plan_expires_at,
-      nextBillingDate: user.subscription_status === 'active' ? user.plan_expires_at : null,
-      paymentMethod,
-    });
-  } catch (err) {
-    console.error('Subscription fetch error:', err);
-    res.status(500).json({ error: 'Failed to fetch subscription' });
-  }
-});
-
-router.post('/cancel', requireAuth, requireGateway, async (req, res) => {
-  try {
-    const user = req.user;
-    if (user.subscription_status !== 'active' || user.plan === 'free') {
-      return res.status(400).json({ error: 'No active subscription' });
-    }
-
-    await pool.query(
-      `UPDATE users SET subscription_status = 'cancelling', updated_at = NOW() WHERE id = $1`,
-      [user.id]
-    );
-
-    res.json({ success: true, message: 'Subscription will remain active until the end of your billing period' });
-  } catch (err) {
-    console.error('Cancel error:', err);
-    res.status(500).json({ error: 'Cancellation failed' });
   }
 });
 
