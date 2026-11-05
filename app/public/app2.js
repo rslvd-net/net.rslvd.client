@@ -940,17 +940,17 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
 
   return React.createElement('div', { className: 'card', style: { marginBottom: 8, marginLeft: isNested ? 24 : 0, borderLeft: isNested ? '3px solid var(--accent)' : undefined } },
     // Header
-    React.createElement('div', { className: 'flex-between', style: { marginBottom: showConnect ? 16 : 0 } },
-      React.createElement('div', null,
-        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+    React.createElement('div', { className: 'flex-between', style: { marginBottom: showConnect ? 16 : 0, flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' } },
+      React.createElement('div', { style: { minWidth: 0, flex: '1 1 220px' } },
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 } },
           isNested && React.createElement('span', { style: { fontSize: 11, color: 'var(--accent)', fontWeight: 600, letterSpacing: 0.5 } }, '└ NESTED'),
-          React.createElement('a', { href: publicUrl, target: '_blank', rel: 'noopener noreferrer', style: { fontWeight: 600, fontSize: 15, color: 'var(--text)', textDecoration: 'none' } }, fqdn)
+          React.createElement('a', { href: publicUrl, target: '_blank', rel: 'noopener noreferrer', style: { fontWeight: 600, fontSize: 15, color: 'var(--text)', textDecoration: 'none', overflowWrap: 'anywhere', wordBreak: 'break-word', minWidth: 0 } }, fqdn)
         ),
-        React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)', marginTop: 2 } },
+        React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)', marginTop: 2, overflowWrap: 'anywhere' } },
           protocol.toUpperCase(), ' ', `localhost:${t.target_port} → `, React.createElement('strong', null, remote ? remoteEndpoint : publicUrl)
         )
       ),
-      React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+      React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '100%' } },
         React.createElement('span', { className: `badge badge-${remote ? 'yellow' : 'purple'}`, style: { fontSize: 10, textTransform: 'uppercase' } }, remote ? `${protocol} · premium` : protocol),
         !remote && React.createElement('button', {
           className: `btn btn-sm ${useHttps ? 'btn-secondary' : 'btn-secondary'}`,
@@ -966,7 +966,8 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
         }, lockBusy ? '...' : (deviceLock ? '🔐 Locked' : '🔓 Any device')),
         React.createElement('span', {
           className: `badge badge-${t.connected ? 'green' : 'yellow'}`,
-          title: t.connected ? 'A tunnel agent is connected' : 'No tunnel agent is connected — run the client with your token'
+          title: t.connected ? 'A tunnel agent is connected' : 'No tunnel agent is connected — run the client with your token',
+          style: { whiteSpace: 'nowrap' }
         }, t.connected ? 'connected' : 'waiting for agent'),
         React.createElement('button', {
           className: `btn btn-primary btn-sm`,
@@ -1297,9 +1298,9 @@ function HostCard({ host: h, onDelete, onRegenKey, onHttpsToggle, onIpUpdated, i
   };
 
   return React.createElement('div', { className: 'card', style: { marginBottom: 8, marginLeft: isNested ? 24 : 0, borderLeft: isNested ? '3px solid var(--accent)' : undefined } },
-    React.createElement('div', { className: 'flex-between', style: { marginBottom: 12 } },
-      React.createElement('div', null,
-        React.createElement('div', { style: { fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 } },
+    React.createElement('div', { className: 'flex-between', style: { marginBottom: 12, flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' } },
+      React.createElement('div', { style: { minWidth: 0, flex: '1 1 220px' } },
+        React.createElement('div', { style: { fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', overflowWrap: 'anywhere' } },
           isNested && React.createElement('span', { style: { fontSize: 11, color: 'var(--accent2)', fontWeight: 500 } }, '└─'),
           h.fqdn,
           isNested && React.createElement('span', { className: 'badge badge-purple', style: { fontSize: 10 } }, 'nested')
@@ -1311,7 +1312,7 @@ function HostCard({ host: h, onDelete, onRegenKey, onHttpsToggle, onIpUpdated, i
           h.last_updated ? `Last update: ${new Date(h.last_updated).toLocaleString()}` : 'Never updated'
         )
       ),
-      React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+      React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '100%' } },
         React.createElement('button', {
           className: 'btn btn-sm btn-secondary',
           onClick: handleHttpsToggle, disabled: toggling,
