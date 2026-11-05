@@ -1430,6 +1430,66 @@ function DnsChangeLog({ hosts, tunnels }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
+// ── Seasonal account ticker ───────────────────────────────────────────────────
+// Meteorological seasons, used for the quarterly account-status reset shown in
+// the dashboard ticker: Dec–Feb winter, Mar–May spring, Jun–Aug summer, Sep–Nov autumn.
+const SEASON_NAMES = { 11: ['Winter', '❄️'], 2: ['Spring', '🌱'], 5: ['Summer', '☀️'], 8: ['Autumn', '🍂'] };
+
+function seasonWindow(now) {
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  let startMonth, startYear;
+  if (m === 11) { startMonth = 11; startYear = y; }
+  else if (m <= 1) { startMonth = 11; startYear = y - 1; }
+  else if (m <= 4) { startMonth = 2; startYear = y; }
+  else if (m <= 7) { startMonth = 5; startYear = y; }
+  else { startMonth = 8; startYear = y; }
+  const [name, emoji] = SEASON_NAMES[startMonth];
+  return { name, emoji, endsAt: new Date(startYear, startMonth + 3, 1) };
+}
+
+function SeasonTicker({ user }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { name, emoji, endsAt } = seasonWindow(now);
+  const msLeft = Math.max(0, endsAt.getTime() - now.getTime());
+  const pad = n => String(n).padStart(2, '0');
+  const countdown = `${Math.floor(msLeft / 86400000)}d ${pad(Math.floor(msLeft % 86400000 / 3600000))}h ${pad(Math.floor(msLeft % 3600000 / 60000))}m ${pad(Math.floor(msLeft % 60000 / 1000))}s`;
+
+  const owner = !!(user && (user.isSiteOwner || user.isAdmin));
+  const donorUntil = user && user.donorExpiresAt ? new Date(user.donorExpiresAt) : null;
+  const donor = owner || !!(user && (user.donor || (donorUntil && donorUntil > now)));
+  const status = owner
+    ? 'Owner — unlimited hostnames & tunnels'
+    : donor
+      ? `Donor until ${donorUntil ? donorUntil.toLocaleDateString() : '—'} — unlimited hostnames & tunnels, SSH & ADB`
+      : 'Free — 2 hostnames + 2 tunnels, no SSH/ADB';
+
+  const items = [`${emoji} ${name} season`, status, `Account status resets in ${countdown}`];
+  const chunk = (key, hidden) => React.createElement('div', {
+    key, 'aria-hidden': hidden ? 'true' : undefined,
+    style: { display: 'flex', gap: 48, paddingRight: 48 }
+  }, items.map((txt, i) => React.createElement('span', { key: i }, txt)));
+
+  return React.createElement('div', {
+    'aria-label': `${name} season. ${status}. Account status resets in ${countdown}.`,
+    style: { position: 'relative', overflow: 'hidden', marginBottom: 20, borderRadius: 999, border: '1px solid var(--border2)', background: 'linear-gradient(90deg, rgba(108,99,255,0.18), rgba(34,211,238,0.10))', padding: '9px 0' }
+  },
+    React.createElement('style', null,
+      '@keyframes rslvdTicker{from{transform:translateX(0)}to{transform:translateX(-50%)}}' +
+      '@media (prefers-reduced-motion: reduce){.rslvd-ticker-track{animation:none!important;transform:none!important}}'
+    ),
+    React.createElement('div', {
+      className: 'rslvd-ticker-track',
+      style: { display: 'flex', width: 'max-content', animation: 'rslvdTicker 30s linear infinite', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600, letterSpacing: 0.3, color: 'var(--text2)' }
+    }, chunk('a', false), chunk('b', true))
+  );
+}
+
 function Dashboard({ user, navigate, refreshUser, pwa }) {
   const [hosts, setHosts] = useState([]);
   const [tunnels, setTunnels] = useState([]);
@@ -1572,6 +1632,9 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         React.createElement('div', { className: 'stat-label' }, 'Active IPs')
       )
     ),
+
+    // Seasonal account status ticker
+    React.createElement(SeasonTicker, { user }),
 
     // Tabs
     React.createElement('div', { style: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid var(--border)' } },
