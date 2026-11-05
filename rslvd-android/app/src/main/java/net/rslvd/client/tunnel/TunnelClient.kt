@@ -98,10 +98,11 @@ class TunnelClient(
             if (resp.startsWith("ERR ")) throw IOException(resp.removePrefix("ERR "))
             if (!resp.trim().startsWith("OK")) throw IOException("unexpected response: $resp")
 
-            publicPort = resp.trim().split(" ").getOrNull(1)
+            val reportedPort = resp.trim().split(" ").getOrNull(1)
+            publicPort = reportedPort
             onStatus(
-                if (isRemoteProtocol(protocol) && publicPort != null)
-                    "connected · $SERVER_HOST${':' + publicPort}"
+                if (isRemoteProtocol(protocol) && reportedPort != null)
+                    "connected · $SERVER_HOST:$reportedPort"
                 else "connected"
             )
             while (scope.isActive) {

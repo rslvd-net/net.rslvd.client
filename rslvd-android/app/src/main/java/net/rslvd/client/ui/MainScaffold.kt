@@ -31,7 +31,7 @@ private enum class Tab(val label: String, val icon: ImageVector) {
     Hosts("Hosts", Icons.Filled.Dns),
     Tunnels("Tunnels", Icons.Filled.SwapHoriz),
     Ddns("DDNS", Icons.Filled.Sync),
-    Billing("Billing", Icons.Filled.CreditCard),
+    Billing("Donate", Icons.Filled.CreditCard),
     Support("Support", Icons.Filled.SupportAgent),
     Account("Account", Icons.Filled.AccountCircle),
 }

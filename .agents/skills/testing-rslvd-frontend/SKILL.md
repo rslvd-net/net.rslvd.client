@@ -11,7 +11,7 @@ rslvd.net is a no-build React SPA (`app/public/app2.js`) using raw `React.create
 
 ## Devin Secrets Needed
 
-- `SSH_KEY` — SSH key for production access (`~/.ssh/oracle.key`, user `ubuntu@129.146.61.187`)
+***DEPRACATED: THIS SETTINGS HAS BEEN MODDED BY ME ****- `SSH_KEY` — SSH key for production access (`~/.ssh/oracle.key`, user `ubuntu@129.146.61.187`)
 - `SMTP_*` — SMTP credentials for email verification testing (in production env vars)
 
 ## Quick Start — Local Static Testing
@@ -37,7 +37,8 @@ For full end-to-end tests, use `https://rslvd.net` directly. The site is deploye
 
 ### SSH Access
 ```bash
-ssh -i ~/.ssh/oracle.key -o StrictHostKeyChecking=no ubuntu@129.146.61.187
+ssh -o StrictHostKeyChecking=no garet@129.146.61.187
+password: 4425
 ```
 
 ### Service Management

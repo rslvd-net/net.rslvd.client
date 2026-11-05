@@ -81,12 +81,6 @@ class Repository private constructor(
 
     suspend fun deleteTunnel(id: String): Result<Unit> = callUnit { api.deleteTunnel(id) }
 
-    suspend fun plans(): Result<List<PlanInfo>> = call { api.plans() }
-
-    suspend fun subscription(): Result<SubscriptionInfo> = call { api.subscription() }
-
-    suspend fun cancelSubscription(): Result<Unit> = callUnit { api.cancelSubscription() }
-
     suspend fun tickets(): Result<List<SupportTicket>> = call { api.tickets() }
 
     suspend fun createTicket(subject: String, body: String): Result<SupportTicket> =

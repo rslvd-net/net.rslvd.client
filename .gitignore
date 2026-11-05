@@ -1,3 +1,4 @@
+.freebuff
 secrets.txt
 surf.pem
 .env
@@ -6,3 +7,4 @@ app\.env
 *secret*
 *env*
 *cred*
+.agent

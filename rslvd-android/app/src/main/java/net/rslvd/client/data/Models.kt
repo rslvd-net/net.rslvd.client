@@ -16,6 +16,10 @@ data class User(
     val tosAccepted: Boolean = true,
     val currentLegalVersion: String? = null,
     val totpEnabled: Boolean = false,
+    // Donation-only model: donor access replaces subscriptions.
+    val donor: Boolean = false,
+    val donorExpiresAt: String? = null,
+    val supporter: Boolean = false,
 )
 
 data class AuthResponse(
@@ -84,30 +88,6 @@ data class CreateTunnelRequest(
     @Json(name = "target_host") val targetHost: String = "localhost",
     val protocol: String = "tcp",
     @Json(name = "force_https") val forceHttps: Boolean = true,
-)
-
-data class PlanInfo(
-    val key: String,
-    val label: String,
-    val amount: String,
-    val maxHosts: Int? = null,
-    val maxTunnels: Int? = null,
-)
-
-data class PaymentMethod(
-    val type: String? = null,
-    val last4: String? = null,
-    val expirationMonth: Int? = null,
-    val expirationYear: Int? = null,
-)
-
-data class SubscriptionInfo(
-    val status: String? = null,
-    val plan: String? = null,
-    val paidThroughDate: String? = null,
-    val nextBillingDate: String? = null,
-    val paymentMethod: PaymentMethod? = null,
-    val error: String? = null,
 )
 
 data class SupportTicket(

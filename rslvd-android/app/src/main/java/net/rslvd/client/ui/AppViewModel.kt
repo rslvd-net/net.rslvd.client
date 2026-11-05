@@ -9,8 +9,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import net.rslvd.client.data.Host
 import net.rslvd.client.data.LoginResult
-import net.rslvd.client.data.PlanInfo
-import net.rslvd.client.data.SubscriptionInfo
 import net.rslvd.client.data.Repository
 import net.rslvd.client.data.SupportTicket
 import net.rslvd.client.data.TicketDetail
@@ -42,8 +40,6 @@ data class SupportState(
 
 data class BillingState(
     val loading: Boolean = false,
-    val plans: List<PlanInfo> = emptyList(),
-    val subscription: SubscriptionInfo? = null,
     val error: String? = null,
 )
 
@@ -262,24 +258,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ── Billing ──────────────────────────────────────────────────────────────
+    // Donation-only model: there are no subscriptions and no plan catalog, so
+    // donor status comes straight from /auth/me. Donations are completed on
+    // rslvd.net (Square), so the app only needs to refresh the user row.
     fun loadBilling() {
         _billing.value = _billing.value.copy(loading = true, error = null)
         viewModelScope.launch {
-            val plans = repo.plans().getOrElse { handleAuthError(it); emptyList() }
-            repo.subscription()
-                .onSuccess { _billing.value = BillingState(plans = plans, subscription = it) }
+            repo.me()
+                .onSuccess {
+                    _user.value = it
+                    _billing.value = BillingState(loading = false)
+                }
                 .onFailure {
                     handleAuthError(it)
-                    _billing.value = BillingState(plans = plans, error = if (plans.isEmpty()) it.message else null)
+                    _billing.value = BillingState(
+                        loading = false,
+                        error = it.message ?: "Could not load your account",
+                    )
                 }
-        }
-    }
-
-    fun cancelSubscription(onDone: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            repo.cancelSubscription()
-                .onSuccess { toast("Subscription will end at your paid-through date"); loadBilling(); refreshUser(); onDone(true) }
-                .onFailure { toast(it.message ?: "Cancellation failed"); onDone(false) }
         }
     }
 

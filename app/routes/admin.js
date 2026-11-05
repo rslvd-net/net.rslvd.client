@@ -65,7 +65,7 @@ router.patch('/users/:id', async (req, res) => {
     const vals = [];
     let i = 1;
     // Donor window: set or clear manually (e.g. comp a donor)
-    if (donorExpiresAt !== undefined) { fields.push(`bonus_expires_at = ${i++}`); vals.push(donorExpiresAt || null); }
+    if (donorExpiresAt !== undefined) { fields.push(`bonus_expires_at = $${i++}`); vals.push(donorExpiresAt || null); }
     // Only site_owner can grant/revoke admin or site_owner
     if (isAdmin !== undefined && isSiteOwner) { fields.push(`is_admin = $${i++}`); vals.push(isAdmin); }
     if (isSiteOwnerFlag !== undefined && isSiteOwner) { fields.push(`is_site_owner = $${i++}`); vals.push(isSiteOwnerFlag); }
