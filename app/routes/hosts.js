@@ -64,7 +64,7 @@ router.post('/', async (req, res) => {
         return res.status(403).json({ error: `Host limit reached (${limit}). Donate to add more.` });
       }
 
-      const updateKey = crypto.randomBytes(2).toString('hex').slice(0, 4);
+      const updateKey = crypto.randomBytes(24).toString('hex');
       const wantHttps = force_https !== false;
       const result = await pool.query(
         `INSERT INTO hosts (user_id, hostname, fqdn, update_key, parent_host_id, parent_tunnel_id, force_https)
@@ -106,7 +106,7 @@ router.post('/', async (req, res) => {
     const existing = await pool.query('SELECT id FROM hosts WHERE fqdn = $1', [fqdn]);
     if (existing.rows[0]) return res.status(409).json({ error: 'Hostname already taken' });
 
-    const updateKey = crypto.randomBytes(2).toString('hex').slice(0, 4);
+    const updateKey = crypto.randomBytes(24).toString('hex');
 
     const wantHttps = force_https !== false;
     const result = await pool.query(
