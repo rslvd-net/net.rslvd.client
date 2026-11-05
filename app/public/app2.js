@@ -122,6 +122,7 @@ function DonationGoal({ navigate }) {
     fetch('/api/billing/goal').then(r => r.json()).then(setGoal).catch(() => {});
   }, []);
   const percent = goal ? Math.min(100, Math.max(0, goal.percent || 0)) : 0;
+  const fillPercent = goal ? Math.max(percent, 3) : 0;
   const money = cents => '$' + ((cents || 0) / 100).toFixed(2);
   return React.createElement('div', { className: 'card', style: { textAlign: 'center', position: 'relative', overflow: 'hidden', borderColor: 'var(--accent)', boxShadow: '0 0 40px rgba(108,99,255,0.25)' } },
     React.createElement('style', null, '@keyframes rslvdStripes{from{background-position:0 0}to{background-position:40px 0}}@keyframes rslvdPulse{0%,100%{box-shadow:0 0 12px rgba(108,99,255,0.5)}50%{box-shadow:0 0 28px rgba(108,99,255,0.9)}}'),
@@ -132,10 +133,10 @@ function DonationGoal({ navigate }) {
     React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 20 } }, 'rslvd is donation-funded. Help us hit our monthly goal and keep every tunnel online.'),
     React.createElement('div', { style: { position: 'relative', height: 44, background: 'var(--bg3)', borderRadius: 999, border: '1px solid var(--border2)', overflow: 'hidden' } },
       React.createElement('div', { style: {
-        width: `${percent}%`, height: '100%', borderRadius: 999,
-        background: 'linear-gradient(90deg, #6c63ff, #a78bfa, #22d3ee)',
-        backgroundSize: '40px 40px',
-        backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.18) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.18) 75%, transparent 75%)',
+        width: `${fillPercent}%`, height: '100%', borderRadius: 999,
+        backgroundColor: '#6c63ff',
+        backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.22) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0.22) 75%, transparent 75%), linear-gradient(90deg, #6c63ff, #a78bfa, #22d3ee)',
+        backgroundSize: '40px 40px, 100% 100%',
         animation: 'rslvdStripes 1s linear infinite, rslvdPulse 2s ease-in-out infinite',
         transition: 'width 1.2s ease'
       } }),
