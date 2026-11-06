@@ -1,47 +1,47 @@
 #!/bin/bash
 set -e
 export PATH=$PATH:/usr/local/go/bin
-export GOPATH=/tmp/gopath
 
-mkdir -p /tmp/tbuild /opt/rslvd/public/dl
-cd /tmp/tbuild
+# CGO must stay off. With it on, a build whose GOARCH matches the build host
+# links against that host's C library: building arm64 on an arm64 server produced
+# an ELF with interpreter /lib/ld-linux-aarch64.so.1, which cannot run on Android
+# (bionic, /system/bin/linker64) — Termux then reports "No such file or directory".
+export CGO_ENABLED=0
 
-# Init module
-if [ ! -f go.mod ]; then
-  go mod init rslvd-tunnel
-fi
-cp /tmp/tunnel-main.go main.go
+SRC_DIR="$(cd "$(dirname "$0")" && pwd)/tunnel-client"
+OUT_DIR="${OUT_DIR:-/opt/rslvd/public/dl}"
+mkdir -p "$OUT_DIR"
 
-echo "Building linux/amd64..."
-GOOS=linux  GOARCH=amd64  go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-linux-amd64   .
+build() {
+  local goarch="$1" name="$2" extra="${3:-}"
+  echo "Building ${name}..."
+  (cd "$SRC_DIR" && env GOOS=linux GOARCH="$goarch" $extra \
+    go build -trimpath -ldflags="-s -w" -o "$OUT_DIR/$name" .)
+}
 
-echo "Building linux/arm64 (64-bit Android/Termux)..."
-GOOS=linux  GOARCH=arm64  go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-linux-arm64   .
-
-echo "Building linux/arm (32-bit Android/Termux)..."
-GOOS=linux  GOARCH=arm GOARM=7 go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-linux-arm    .
-
-echo "Building linux/mips (big-endian, most OpenWRT/DD-WRT routers)..."
-GOOS=linux  GOARCH=mips   GOMIPS=softfloat go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-linux-mips      .
-
-echo "Building linux/mipsle (little-endian MIPS routers)..."
-GOOS=linux  GOARCH=mipsle GOMIPS=softfloat go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-linux-mipsle    .
-
-echo "Building linux/mips64 (64-bit MIPS routers)..."
-GOOS=linux  GOARCH=mips64   GOMIPS64=softfloat go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-linux-mips64    .
+build amd64 rslvd-tunnel-linux-amd64
+build arm64 rslvd-tunnel-linux-arm64            # 64-bit Android/Termux
+build arm   rslvd-tunnel-linux-arm "GOARM=7"    # 32-bit Android/Termux
+build mips  rslvd-tunnel-linux-mips  "GOMIPS=softfloat"
+build mipsle rslvd-tunnel-linux-mipsle "GOMIPS=softfloat"
+build mips64 rslvd-tunnel-linux-mips64 "GOMIPS64=softfloat"
 
 echo "Building darwin/amd64..."
-GOOS=darwin GOARCH=amd64  go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-darwin-amd64  .
-
+(cd "$SRC_DIR" && GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$OUT_DIR/rslvd-tunnel-darwin-amd64" .)
 echo "Building darwin/arm64 (Apple Silicon)..."
-GOOS=darwin GOARCH=arm64  go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-darwin-arm64  .
-
+(cd "$SRC_DIR" && GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o "$OUT_DIR/rslvd-tunnel-darwin-arm64" .)
 echo "Building windows/amd64..."
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o /opt/rslvd/public/dl/rslvd-tunnel-windows-amd64.exe .
+(cd "$SRC_DIR" && GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$OUT_DIR/rslvd-tunnel-windows-amd64.exe" .)
 
-chmod +x /opt/rslvd/public/dl/rslvd-tunnel-*
-chown -R rslvd:rslvd /opt/rslvd/public/dl
+chmod +x "$OUT_DIR"/rslvd-tunnel-*
+chown -R rslvd:rslvd "$OUT_DIR" 2>/dev/null || true
 
 echo ""
 echo "Done! Binaries:"
-ls -lh /opt/rslvd/public/dl/
+ls -lh "$OUT_DIR/"
+echo ""
+echo "Linux builds must be static (no PT_INTERP):"
+for f in "$OUT_DIR"/rslvd-tunnel-linux-*; do
+  printf '  %s: ' "$(basename "$f")"
+  readelf -l "$f" 2>/dev/null | grep -qi interpreter && echo "DYNAMIC (broken for Android)" || echo "static"
+done
