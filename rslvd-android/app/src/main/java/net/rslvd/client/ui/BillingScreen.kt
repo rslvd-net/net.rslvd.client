@@ -75,9 +75,9 @@ fun BillingScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 } else {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Free tier: up to ${user?.maxHosts ?: 2} hostnames and ${user?.maxTunnels ?: 2} tunnels. " +
-                            "A donation unlocks unlimited hostnames and tunnels, SSH/ADB remote access, " +
-                            "and nested subdomains for 90 days.",
+                        "Free tier: up to ${user?.maxHosts ?: 2} hostnames and ${user?.maxTunnels ?: 2} tunnels, " +
+                            "plus one SSH and one ADB tunnel. A donation unlocks unlimited hostnames and " +
+                            "tunnels, unlimited SSH/ADB tunnels, and nested subdomains for 90 days.",
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontSize = 14.sp,
                     )
                 }

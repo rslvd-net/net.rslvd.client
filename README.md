@@ -810,8 +810,10 @@ Plans are defined in `app/lib/plans.js` and charged via the Square Payments API:
 | Semi-Annual | $4.99/6mo | 24 | 24 |
 | Annual | $8.99/yr | Unlimited | Unlimited |
 
-Remote access (SSH/ADB raw-port tunnels) is a premium feature: it is included in
-every paid plan above and is not available on the free tier.
+Remote access (SSH/ADB raw-port tunnels) is not donor-only: a free account can
+hold one SSH and one ADB tunnel in addition to its general tunnels, and these
+are counted separately from the tunnel limit above. Donors and the site owner
+get unlimited SSH and ADB tunnels.
 
 ### Site Owner Account
 

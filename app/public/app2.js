@@ -151,7 +151,7 @@ function DonationGoal({ navigate }) {
       React.createElement('button', { className: 'btn btn-primary btn-lg', onClick: () => navigate('/register') }, 'Create account & donate →'),
       React.createElement('button', { className: 'btn btn-secondary btn-lg', onClick: () => navigate('/register') }, 'Start free')
     ),
-    React.createElement('p', { style: { color: 'var(--text3)', fontSize: 12, marginTop: 14 } }, 'Free: 2 hostnames + 2 tunnels, forever. No ADB or SSH tunnels on free accounts.')
+    React.createElement('p', { style: { color: 'var(--text3)', fontSize: 12, marginTop: 14 } }, 'Free: 2 hostnames + 2 tunnels, plus one SSH and one ADB tunnel, forever.')
   );
 }
 
@@ -164,7 +164,7 @@ function Landing({ navigate }) {
     { icon: '🔗', title: 'DynDNS Compatible', desc: 'Drop-in replacement for any DynDNS client. Works with Asus, Synology, Ubiquiti, pfSense, and more.' },
     { icon: '🔒', title: 'Token Security', desc: 'Each host and tunnel gets its own unique token. Revoke or rotate instantly from your dashboard.' },
     { icon: '📱', title: 'Every Platform', desc: 'Single binary for Linux, macOS, Windows, Android (Termux), and routers. No dependencies, no runtime.' },
-    { icon: '🛰', title: 'Remote ADB & SSH', desc: 'Donors get raw-port tunnels: a real TCP port on rslvd.net for adb connect, ssh -p, RDP and more — no port forwarding, no VPN.' },
+    { icon: '🛰', title: 'Remote ADB & SSH', desc: 'Raw-port tunnels put a real TCP port on rslvd.net for adb connect, ssh -p, RDP and more — one SSH and one ADB free, unlimited for donors.' },
     { icon: '⚡', title: 'Instant Setup', desc: 'Register, grab your token, run one command. Your tunnel is live in under 30 seconds.' },
   ];
 
@@ -173,7 +173,7 @@ function Landing({ navigate }) {
     { icon: '💻', title: 'Dev & Testing', desc: 'Share a localhost dev server with a client or teammate instantly. No VPN, no ngrok account, no bandwidth limits.' },
     { icon: '📹', title: 'IP Cameras & NVRs', desc: 'Access your cameras remotely without a static IP. Point rslvd.privatedns.org at your NVR and you\'re done.' },
     { icon: '🌍', title: 'Remote Access', desc: 'SSH, RDP, VNC — tunnel any protocol. Access your home PC or office server from anywhere.' },
-    { icon: '🛰', title: 'ADB & SSH Tunnels', desc: 'Donor raw-port tunnels give you rslvd.net:<port> — adb connect to a phone or ssh into a box behind CGNAT from anywhere in the world.' },
+    { icon: '🛰', title: 'ADB & SSH Tunnels', desc: 'Raw-port tunnels give you rslvd.net:<port> — one SSH and one ADB free, so you can adb connect to a phone or ssh into a box behind CGNAT from anywhere.' },
   ];
 
   const faqs = [
@@ -181,7 +181,7 @@ function Landing({ navigate }) {
     { q: 'How is this different from ngrok?', a: 'rslvd.privatedns.org gives you a permanent subdomain (not a random URL), supports WebSockets, works on routers and Android, has no session time limits, and costs a fraction of the price.' },
     { q: 'Does the tunnel support HTTPS?', a: 'Yes. All tunnels are served over HTTPS via *.rslvd.privatedns.org — our wildcard SSL certificate covers every subdomain. Your traffic is encrypted end-to-end from browser to server.' },
     { q: 'Can I run multiple tunnels?', a: 'Yes. Free accounts get 2 tunnels; donors get unlimited tunnels. Each tunnel gets its own subdomain and token.' },
-    { q: 'Can I reach my phone or SSH server from anywhere?', a: 'Yes — with donor access. SSH (-ssh) and ADB (-adb) tunnels publish a real TCP port on rslvd.net, so from any machine you can run "adb connect rslvd.net:<port>" or "ssh -p <port> user@rslvd.net". Perfect for a home server or an Android device behind CGNAT.' },
+    { q: 'Can I reach my phone or SSH server from anywhere?', a: 'Yes. Free accounts include one SSH and one ADB tunnel and donors get unlimited: SSH (-ssh) and ADB (-adb) tunnels publish a real TCP port on rslvd.net, so from any machine you can run "adb connect rslvd.net:<port>" or "ssh -p <port> user@rslvd.net". Perfect for a home server or an Android device behind CGNAT.' },
     { q: 'Does it work on OpenWRT / DD-WRT?', a: 'Yes — dedicated one-line installers for both. Auto-detects your router\'s architecture (MIPS, ARM, x86) and persistent storage location.' },
   ];
 
@@ -717,13 +717,15 @@ function SupportPage({ user, navigate }) {
   );
 }
 
-// ── Remote access (premium SSH / ADB raw-port tunnels) ────────────────────────
+// ── Remote access (SSH / ADB raw-port tunnels - 1 free each) ────────────────────────
 const REMOTE_PROTOCOLS = ['ssh', 'adb'];
 const isRemoteProtocol = (p) => REMOTE_PROTOCOLS.includes(String(p || '').toLowerCase());
 const hasRemoteAccess = (user) => !!(user && (
   user.isSiteOwner || user.role === 'site_owner' || user.role === 'admin' ||
   user.donor || user.plan === 'donor'
 ));
+// Free accounts get one SSH and one ADB tunnel; donors get unlimited.
+const FREE_REMOTE = { ssh: 1, adb: 1 };
 const protocolFlagFor = (p) => (p === 'udp' ? '-udp ' : isRemoteProtocol(p) ? `-${String(p).toLowerCase()} ` : '');
 
 // ── Tunnel Modal ──────────────────────────────────────────────────────────────
@@ -733,6 +735,13 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels, existingHosts 
   const [protocol, setProtocol] = useState('tcp');
   const [showUpgrade, setShowUpgrade] = useState(false);
   const remoteOk = hasRemoteAccess(user);
+  // SSH and ADB are counted per protocol, so a free account can hold one of each.
+  const remoteUsed = (existingTunnels || []).reduce((acc, t) => {
+    const p = String(t.protocol || '').toLowerCase();
+    if (REMOTE_PROTOCOLS.includes(p)) acc[p] = (acc[p] || 0) + 1;
+    return acc;
+  }, {});
+  const remoteBlocked = (p) => !remoteOk && (remoteUsed[p] || 0) >= (FREE_REMOTE[p] || 0);
   const [isNested, setIsNested] = useState(false);
   const [parentId, setParentId] = useState('');
   const [error, setError] = useState('');
@@ -830,13 +839,13 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels, existingHosts 
           [
             { key: 'tcp', label: '🔌 TCP', desc: 'Standard tunnel for HTTP/WebSocket' },
             { key: 'udp', label: '📡 UDP', desc: 'For DNS, VoIP, games' },
-            { key: 'ssh', label: '🐚 SSH', desc: 'Premium — real public port straight to your SSH daemon', premium: true },
-            { key: 'adb', label: '🤖 ADB', desc: 'Premium — adb connect to your device from anywhere', premium: true }
+            { key: 'ssh', label: '🐚 SSH', desc: 'Real public port straight to your SSH daemon — 1 free', remote: true },
+            { key: 'adb', label: '🤖 ADB', desc: 'adb connect to your device from anywhere — 1 free', remote: true }
           ].map(p => React.createElement('button', {
             key: p.key, type: 'button',
             className: `btn btn-sm ${protocol === p.key ? 'btn-primary' : 'btn-secondary'}`,
             onClick: () => {
-              if (p.premium && !remoteOk) { setShowUpgrade(true); return; }
+              if (p.remote && remoteBlocked(p.key)) { setShowUpgrade(true); return; }
               setShowUpgrade(false);
               setProtocol(p.key);
               if (p.key === 'ssh') setTargetPort('22');
@@ -844,10 +853,10 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels, existingHosts 
             },
             title: p.desc,
             style: { flex: 1, minWidth: 96 }
-          }, p.label + (p.premium && !remoteOk ? ' 🔒' : '')))
+          }, p.label + (p.remote && remoteBlocked(p.key) ? ' 🔒' : '')))
         ),
         showUpgrade && React.createElement('div', { className: 'alert alert-info', style: { marginTop: 10, marginBottom: 0 } },
-          '🔒 SSH and ADB tunnels are a premium feature. They publish a real TCP port (20000-29999) on rslvd.net so any SSH or adb client can reach this machine — available on every paid plan.'
+          '🔒 Free accounts include one SSH and one ADB tunnel — you already have both. Delete one, or donate for unlimited raw-port tunnels on rslvd.net (public ports 20000-29999).'
         ),
         React.createElement('p', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 6 } },
           protocol === 'tcp' && 'Works with HTTP, HTTPS, WebSockets, SSH, RDP — any TCP protocol.',
@@ -952,7 +961,7 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
         )
       ),
       React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '100%' } },
-        React.createElement('span', { className: `badge badge-${remote ? 'yellow' : 'purple'}`, style: { fontSize: 10, textTransform: 'uppercase' } }, remote ? `${protocol} · premium` : protocol),
+        React.createElement('span', { className: `badge badge-${remote ? 'yellow' : 'purple'}`, style: { fontSize: 10, textTransform: 'uppercase' } }, remote ? `${protocol} · raw port` : protocol),
         !remote && React.createElement('button', {
           className: `btn btn-sm ${useHttps ? 'btn-secondary' : 'btn-secondary'}`,
           onClick: handleHttpsToggle, disabled: toggling,
@@ -1468,7 +1477,7 @@ function SeasonTicker({ user }) {
     ? 'Owner — unlimited hostnames & tunnels'
     : donor
       ? `Donor until ${donorUntil ? donorUntil.toLocaleDateString() : '—'} — unlimited hostnames & tunnels, SSH & ADB`
-      : 'Free — 2 hostnames + 2 tunnels, no SSH/ADB';
+      : 'Free — 2 hostnames + 2 tunnels + 1 SSH + 1 ADB';
 
   const items = [`${emoji} ${name} season`, status, `Account status resets in ${countdown}`];
   const chunk = (key, hidden) => React.createElement('div', {
@@ -1598,7 +1607,11 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
   const isDonor = user.plan === 'donor';
   const isFree = !isDonor;
   const canAddHost = hosts.length < (user.maxHosts || 2);
-  const canAddTunnel = tunnels.length < (user.maxTunnels || 2);
+  // Free accounts hold 2 general tunnels plus one SSH and one ADB.
+  const tunnelAllowance = user.maxTunnels >= 999999
+    ? Infinity
+    : (user.maxTunnels || 2) + Object.values(FREE_REMOTE).reduce((a, b) => a + b, 0);
+  const canAddTunnel = tunnels.length < tunnelAllowance;
 
   return React.createElement('div', { className: 'dashboard' },
     msg && React.createElement(Alert, { type: 'success' }, msg),
@@ -1625,7 +1638,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         React.createElement('div', { className: 'stat-label' }, 'Hostnames used')
       ),
       React.createElement('div', { className: 'stat-card' },
-        React.createElement('div', { className: 'stat-value' }, `${tunnels.length}/${user.maxTunnels >= 999999 ? '∞' : (user.maxTunnels || 2)}`),
+        React.createElement('div', { className: 'stat-value' }, `${tunnels.length}/${tunnelAllowance === Infinity ? '∞' : tunnelAllowance}`),
         React.createElement('div', { className: 'stat-label' }, 'Tunnels used')
       ),
       React.createElement('div', { className: 'stat-card' },
@@ -1693,22 +1706,22 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
         React.createElement('a', { href: '/tutorials/windows-tunnel', onClick: e => { e.preventDefault(); navigate('/tutorials/windows-tunnel'); }, style: { color: 'var(--accent2)', fontWeight: 600 } }, '🪟 Windows tutorial')
       ),
 
-      // Remote access (premium SSH/ADB) banner
+      // Remote access (SSH/ADB) banner
       React.createElement('div', { className: 'card mb-4', style: { display: 'flex', gap: 14, alignItems: 'flex-start', borderColor: hasRemoteAccess(user) ? 'var(--border)' : 'var(--accent)' } },
         React.createElement('div', { style: { fontSize: 24 } }, '🛰'),
         React.createElement('div', { style: { flex: 1 } },
           React.createElement('h3', { style: { marginBottom: 4, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 } },
             'Remote access — SSH & ADB over the internet',
-            React.createElement('span', { className: 'badge badge-yellow', style: { fontSize: 10 } }, 'PREMIUM')
+            React.createElement('span', { className: 'badge badge-yellow', style: { fontSize: 10 } }, hasRemoteAccess(user) ? 'PREMIUM' : '1 FREE EACH')
           ),
           React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, margin: 0 } },
             hasRemoteAccess(user)
               ? 'Create an SSH or ADB tunnel and it gets a real public port on rslvd.net (20000-29999): connect with "ssh -p <port> <user>@rslvd.net" or "adb connect rslvd.net:<port>".'
-              : 'SSH and ADB tunnels publish a real public port on rslvd.net so you can reach a machine — or a phone — behind CGNAT from anywhere. Included with donor access.'
+              : 'SSH and ADB tunnels publish a real public port on rslvd.net so you can reach a machine — or a phone — behind CGNAT from anywhere. One of each is free; a donation makes it unlimited.'
           ),
-          !hasRemoteAccess(user) && React.createElement('button', {
+          React.createElement('button', {
             className: 'btn btn-primary btn-sm', style: { marginTop: 10 }, onClick: () => setTab('billing')
-          }, '🔒 Unlock remote access')
+          }, hasRemoteAccess(user) ? '💜 Support rslvd' : '💜 Donate for unlimited')
         )
       ),
       tunnels.length === 0
@@ -1728,7 +1741,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
             ]);
           })(),
       !canAddTunnel && tunnels.length > 0 && React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 24, marginTop: 12 } },
-        React.createElement('p', { style: { color: 'var(--text2)', marginBottom: 12 } }, `Tunnel limit reached (${user.maxTunnels >= 999999 ? 'Unlimited' : user.maxTunnels}). Donate for unlimited access.`),
+        React.createElement('p', { style: { color: 'var(--text2)', marginBottom: 12 } }, `Tunnel limit reached (${tunnelAllowance === Infinity ? 'Unlimited' : tunnelAllowance}). Donate for unlimited access.`),
         React.createElement('button', { className: 'btn btn-primary btn-sm', onClick: () => setTab('billing') }, 'Donate')
       )
     ),
@@ -1745,7 +1758,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
             React.createElement('div', null,
               React.createElement('h3', { style: { marginBottom: 4 } }, 'Support rslvd'),
               React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, 'Donations are the only way to unlock donor access. Our goal is $22.50 a month to keep rslvd running. Any donation, minimum $1, gives you 3 months of donor access.'),
-              React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, marginTop: 4 } }, 'Donor access: unlimited hostnames and tunnels, SSH and ADB tunnels, and nested subdomains & tunnels.'),
+              React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, marginTop: 4 } }, 'Donor access: unlimited hostnames and tunnels, unlimited SSH and ADB tunnels, and nested subdomains & tunnels.'),
               user.isSiteOwner
                 ? React.createElement('p', { style: { color: 'var(--accent2)', fontSize: 13, marginTop: 4, fontWeight: 600 } }, 'Site owner: unlimited access, no donation needed.')
                 : isDonor && React.createElement('p', { style: { color: 'var(--accent2)', fontSize: 13, marginTop: 4, fontWeight: 600 } }, 'Donor access active until ' + new Date(user.donorExpiresAt).toLocaleDateString())
@@ -1776,7 +1789,7 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
           React.createElement('div', { style: { fontSize: 24 } }, '🎁'),
           React.createElement('div', null,
             React.createElement('h3', { style: { marginBottom: 4 } }, 'Current: Free'),
-            React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, '2 hostnames · 2 tunnels · no SSH or ADB tunnels · no nesting')
+            React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14 } }, '2 hostnames · 2 tunnels · 1 SSH + 1 ADB tunnel · no nesting')
           )
         )
       )
@@ -3255,7 +3268,7 @@ function TutorialLinuxTunnel({ navigate }) {
       React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, lineHeight: 1.6 } },
         'Go to Dashboard → Tunnels tab and click ', React.createElement('strong', null, '+ New tunnel'), '. Choose a subdomain name, set the target port (the local port your service runs on, e.g. 3000), and select the protocol (TCP is the default).'
       ),
-      React.createElement(TutorialNote, null, 'TCP works for HTTP, HTTPS, WebSockets, SSH, and most protocols. Use UDP for game servers or VoIP. On a paid plan, -ssh and -adb tunnels publish a real public port so SSH and adb clients can connect from anywhere.')
+      React.createElement(TutorialNote, null, 'TCP works for HTTP, HTTPS, WebSockets, SSH, and most protocols. Use UDP for game servers or VoIP. One SSH and one ADB tunnel are free (unlimited for donors): -ssh and -adb publish a real public port so SSH and adb clients can connect from anywhere.')
     ),
 
     React.createElement(TutorialStep, { num: '3', title: 'Install the tunnel client' },
@@ -3284,7 +3297,7 @@ function TutorialLinuxTunnel({ navigate }) {
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/terminal-linux-tunnel.png', alt: 'Terminal showing tunnel running' }),
       React.createElement(TutorialNote, null,
         'For UDP services, use: rslvd-tunnel -udp YOUR_TOKEN PORT\n' +
-        'Remote access (paid plans): rslvd-tunnel -ssh YOUR_TOKEN 22  →  ssh -p <public-port> you@rslvd.net'
+        'Remote access (1 free SSH): rslvd-tunnel -ssh YOUR_TOKEN 22  →  ssh -p <public-port> you@rslvd.net'
       )
     ),
 
@@ -3378,7 +3391,7 @@ function TutorialWindowsTunnel({ navigate }) {
       React.createElement(TutorialScreenshot, { src: '/img/tutorials/terminal-windows-tunnel.png', alt: 'PowerShell running tunnel' }),
       React.createElement(TutorialNote, null,
         'For UDP: .\\rslvd-tunnel-windows-amd64.exe -udp YOUR_TOKEN PORT\n' +
-        'Remote access (paid plans): .\\rslvd-tunnel-windows-amd64.exe -adb YOUR_TOKEN 5555  →  adb connect rslvd.net:<public-port>'
+        'Remote access (1 free ADB): .\\rslvd-tunnel-windows-amd64.exe -adb YOUR_TOKEN 5555  →  adb connect rslvd.net:<public-port>'
       )
     ),
 
@@ -3597,7 +3610,7 @@ function DownloadsPage({ navigate }) {
       'rslvd-tunnel v', VERSION, ' — Dynamic DNS + CGNAT tunnel client'
     ),
     React.createElement('p', { style: { color: 'var(--text3)', marginBottom: 32, fontSize: 13 } },
-      'Single binary, no dependencies. Supports TCP, UDP, and premium remote-access modes for SSH and ADB.'
+      'Single binary, no dependencies. Supports TCP, UDP, and raw-port remote-access modes for SSH and ADB (one of each free).'
     ),
 
     // Quick install box

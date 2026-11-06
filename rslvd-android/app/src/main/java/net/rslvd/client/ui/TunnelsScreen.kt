@@ -54,11 +54,17 @@ fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier, onUpgrade: ((
     var confirmDelete by remember { mutableStateOf<Tunnel?>(null) }
     var showPremiumDialog by remember { mutableStateOf(false) }
 
-    // Remote access (SSH/ADB) is a premium feature — any paid plan unlocks it
-    val hasRemoteAccess = user?.let {
+    // Remote access (SSH/ADB): donors get unlimited, free accounts one of each.
+    val hasUnlimitedRemote = user?.let {
         it.isSiteOwner || it.role == "site_owner" || it.role == "admin" ||
             (it.plan != null && it.plan != "free" && it.status != "free" && it.status != "inactive")
     } ?: false
+    val remoteUsedByProtocol = state.items.groupBy { it.protocol?.lowercase() }.mapValues { it.value.size }
+    fun remoteAllowed(protocol: String): Boolean {
+        if (hasUnlimitedRemote) return true
+        val freeQuota = if (protocol.lowercase() in setOf("ssh", "adb")) 1 else 0
+        return (remoteUsedByProtocol[protocol.lowercase()] ?: 0) < freeQuota
+    }
 
     val requestNotifications = rememberNotificationPermissionRequest()
 
@@ -122,7 +128,7 @@ fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier, onUpgrade: ((
 
     if (showAdd) {
         AddTunnelDialog(
-            hasRemoteAccess = hasRemoteAccess,
+            remoteAllowed = { p -> remoteAllowed(p) },
             onPremiumBlocked = { showPremiumDialog = true },
             onDismiss = { showAdd = false },
             onConfirm = { name, port, host, proto, https ->
@@ -134,12 +140,13 @@ fun TunnelsScreen(vm: AppViewModel, modifier: Modifier = Modifier, onUpgrade: ((
     if (showPremiumDialog) {
         AlertDialog(
             onDismissRequest = { showPremiumDialog = false },
-            title = { Text("\uD83D\uDEE0 Premium feature") },
+            title = { Text("\uD83D\uDEE0 Free SSH & ADB used") },
             text = {
                 Text(
                     "SSH and ADB tunnels publish a real public TCP port on rslvd.net, so you can run " +
                         "\"ssh -p <port> user@rslvd.net\" or \"adb connect rslvd.net:<port>\" from anywhere — " +
-                        "no port forwarding, no VPN. Every paid plan includes them."
+                        "no port forwarding, no VPN. Free accounts include one SSH and one ADB " +
+                        "tunnel; a donation makes them unlimited."
                 )
             },
             confirmButton = {
@@ -218,7 +225,7 @@ private fun remoteEndpoint(t: Tunnel): String {
 
 @Composable
 private fun AddTunnelDialog(
-    hasRemoteAccess: Boolean,
+    remoteAllowed: (String) -> Boolean,
     onPremiumBlocked: () -> Unit,
     onDismiss: () -> Unit,
     onConfirm: (String, Int, String, String, Boolean) -> Unit,
@@ -243,16 +250,16 @@ private fun AddTunnelDialog(
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("tcp", "udp", "ssh", "adb").forEach { p ->
-                        val premium = TunnelClient.isRemoteProtocol(p)
+                        val locked = TunnelClient.isRemoteProtocol(p) && !remoteAllowed(p)
                         FilterChip(
                             selected = proto == p,
                             onClick = {
-                                if (premium && !hasRemoteAccess) { onPremiumBlocked(); return@FilterChip }
+                                if (locked) { onPremiumBlocked(); return@FilterChip }
                                 proto = p
                                 if (p == "ssh" && port.isBlank()) port = "22"
                                 if (p == "adb" && port.isBlank()) port = "5555"
                             },
-                            label = { Text(if (premium && !hasRemoteAccess) "$p \uD83D\uDD12" else p) },
+                            label = { Text(if (locked) "$p \uD83D\uDD12" else p) },
                         )
                     }
                 }

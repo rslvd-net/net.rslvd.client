@@ -6,14 +6,18 @@ const ionos = require('../lib/ionos');
 const activity = require('../lib/activity');
 const dnsAudit = require('../lib/dns-audit');
 const tunnelCert = require('../lib/tunnel-cert');
-const { isRemoteProtocol, hasRemoteAccess, canNest, limitsFor } = require('../lib/plans');
+const {
+  REMOTE_PROTOCOLS, isRemoteProtocol, hasRemoteAccess, canNest, limitsFor,
+  freeRemoteQuota, tunnelLimitFor,
+} = require('../lib/plans');
 const tunnelProxy = require('../lib/tunnel-proxy');
 
 const PORT_MIN = 20000;
 const PORT_MAX = 29999;
 const LABEL_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
-// tcp/udp ride the HTTP & UDP proxies; ssh/adb are donor-only raw-port tunnels
+// tcp/udp ride the HTTP & UDP proxies; ssh/adb are raw-port tunnels (one of
+// each on free accounts, unlimited for donors)
 const ALLOWED_PROTOCOLS = ['tcp', 'udp', 'ssh', 'adb'];
 const SERVER_HOST = () => process.env.BASE_DOMAIN || 'rslvd.net';
 
@@ -58,19 +62,33 @@ router.get('/', async (req, res) => {
   res.json(result.rows.map((t) => ({ ...withRemoteMeta(t), connected: tunnelProxy.isConnected(t.fqdn) })));
 });
 
-// ── Remote access (premium SSH / ADB) capability for the dashboard ────────────
+// ── Remote access (SSH / ADB) capability and remaining free quota ────────────
 router.get('/remote-access', async (req, res) => {
   const user = req.user;
-  const eligible = hasRemoteAccess(user);
+  const donor = hasRemoteAccess(user);
+  const used = { ssh: 0, adb: 0 };
+  try {
+    const result = await pool.query(
+      `SELECT protocol, COUNT(*)::int AS count FROM tunnels
+        WHERE user_id = $1 AND active = TRUE AND protocol = ANY($2)
+        GROUP BY protocol`,
+      [user.id, REMOTE_PROTOCOLS]
+    );
+    for (const row of result.rows) used[row.protocol] = row.count;
+  } catch (e) {
+    console.error('remote-access usage failed:', e.message);
+  }
+  const quotaFor = (key) => (donor ? null : freeRemoteQuota(key));
   res.json({
-    eligible,
-    upgrade_required: !eligible,
+    eligible: true,
+    donor,
+    upgrade_required: false,
     host: SERVER_HOST(),
     port_min: PORT_MIN,
     port_max: PORT_MAX,
     protocols: [
-      { key: 'ssh', label: 'SSH', default_port: 22, desc: 'SSH into a machine behind CGNAT or a firewall' },
-      { key: 'adb', label: 'ADB', default_port: 5555, desc: 'adb connect to an Android device anywhere in the world' },
+      { key: 'ssh', label: 'SSH', default_port: 22, desc: 'SSH into a machine behind CGNAT or a firewall', quota: quotaFor('ssh'), used: used.ssh, available: donor || used.ssh < freeRemoteQuota('ssh') },
+      { key: 'adb', label: 'ADB', default_port: 5555, desc: 'adb connect to an Android device anywhere in the world', quota: quotaFor('adb'), used: used.adb, available: donor || used.adb < freeRemoteQuota('adb') },
     ],
   });
 });
@@ -90,13 +108,6 @@ router.post('/', async (req, res) => {
     }
     const remote = isRemoteProtocol(protocolKey);
 
-    // ── Premium gate: SSH/ADB over a raw public port ──────────────────────────
-    if (remote && !hasRemoteAccess(user)) {
-      return res.status(403).json({
-        error: 'Remote access (SSH/ADB over a public port) is for donors. Donate to unlock it.',
-        upgrade_required: true,
-      });
-    }
     // ── Nested tunnel path ───────────────────────────────────────────────────
     if (parent_id) {
       if (!canNest(user)) {
@@ -166,12 +177,25 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid name. Lowercase letters, numbers, hyphens only.' });
     }
 
-    const limit = limitsFor(user).tunnels;
-    const countResult = await pool.query(
-      'SELECT COUNT(*) FROM tunnels WHERE user_id = $1 AND active = TRUE', [user.id]
-    );
-    if (parseInt(countResult.rows[0].count) >= limit) {
-      return res.status(403).json({ error: `Tunnel limit reached (${limit}). Donate to add more.` });
+    // ── Quota: 2 general tunnels + 1 SSH + 1 ADB for free accounts ────────────
+    // SSH/ADB are counted per protocol, so they never eat the general allowance.
+    const limit = tunnelLimitFor(user, protocolKey);
+    const countResult = remote
+      ? await pool.query(
+        'SELECT COUNT(*) FROM tunnels WHERE user_id = $1 AND active = TRUE AND protocol = $2',
+        [user.id, protocolKey]
+      )
+      : await pool.query(
+        `SELECT COUNT(*) FROM tunnels WHERE user_id = $1 AND active = TRUE AND protocol NOT IN ('ssh','adb')`,
+        [user.id]
+      );
+    if (parseInt(countResult.rows[0].count, 10) >= limit) {
+      return res.status(403).json({
+        error: remote
+          ? `Your free account includes ${limit} ${protocolKey.toUpperCase()} tunnel${limit === 1 ? '' : 's'}. Delete it or donate for unlimited remote access.`
+          : `Tunnel limit reached (${limit}). Donate to add more.`,
+        upgrade_required: true,
+      });
     }
 
     // Block reserved subdomains

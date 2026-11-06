@@ -13,7 +13,7 @@
  *   Data port 7101: UDP packet relay between public and client
  *   Public UDP port 8081: receives UDP packets, routes by source address
  *
- * Remote Access Tunnels (premium — SSH, ADB):
+ * Remote Access Tunnels (SSH, ADB — one of each on free accounts):
  *   The tunnel's public TCP port (tunnel_port, 20000-29999) is bound directly
  *   on the server. Inbound bytes are piped to the client over the same
  *   7000/7001 control+data channel used by TCP tunnels, so binary protocols
@@ -23,7 +23,7 @@
 const net  = require('net');
 const dgram = require('dgram');
 const pool = require('../db/pool');
-const { hasRemoteAccess } = require('./plans');
+const { hasRemoteAccess, remoteQuotaFor, canUseRemoteProtocol } = require('./plans');
 
 // TCP Tunnel ports
 const TCP_CONTROL_PORT = 7000;
@@ -163,7 +163,7 @@ const tcpControlServer = net.createServer(async (conn) => {
   let row;
   try {
     const result = await pool.query(
-      `SELECT t.id, t.fqdn, t.protocol, t.status, t.device_lock, t.bound_device, t.tunnel_port,
+      `SELECT t.id, t.fqdn, t.protocol, t.status, t.device_lock, t.bound_device, t.tunnel_port, t.user_id,
               u.bonus_expires_at, u.is_site_owner, u.is_admin
        FROM tunnels t LEFT JOIN users u ON t.user_id = u.id
        WHERE t.token = $1 AND t.active = TRUE`,
@@ -184,11 +184,27 @@ const tcpControlServer = net.createServer(async (conn) => {
 
   const isRemoteAccess = isRawProtocol(row.protocol);
 
-  // Remote-access tunnels (SSH/ADB) are donor-only
+  // Remote-access tunnels (SSH/ADB): unlimited for donors, one per protocol on
+  // free accounts. A tunnel left over from an expired donation stops connecting.
   if (isRemoteAccess && !hasRemoteAccess(row)) {
-    sendLine(conn, 'ERR remote access (SSH/ADB) requires a donation — see rslvd.net/donate');
-    conn.destroy();
-    return;
+    let held = 0;
+    try {
+      const countResult = await pool.query(
+        'SELECT COUNT(*) FROM tunnels WHERE user_id = $1 AND active = TRUE AND protocol = $2',
+        [row.user_id, row.protocol]
+      );
+      held = parseInt(countResult.rows[0].count, 10);
+    } catch (e) {
+      sendLine(conn, 'ERR database error');
+      conn.destroy();
+      return;
+    }
+    if (!canUseRemoteProtocol(row, row.protocol, held - 1)) {
+      const quota = remoteQuotaFor(row, row.protocol);
+      sendLine(conn, `ERR free accounts include ${quota} ${String(row.protocol).toUpperCase()} tunnel — delete the extra one or donate for unlimited remote access`);
+      conn.destroy();
+      return;
+    }
   }
 
   // Claim a public port for remote tunnels that don't have one yet
