@@ -14,9 +14,13 @@
 #   ./termux-build.sh                 # first run: install packages, SDK, Gradle; then build
 #   ./termux-build.sh --clean         # wipe app/build first
 #   ./termux-build.sh --heap 3072     # give Gradle more (or less) heap
-#   ./termux-build.sh -- :app:assembleRelease   # anything after -- goes to gradlew
+#   ./termux-build.sh --release       # release APK signed with keystore.properties
+#   ./termux-build.sh --release --aab # signed App Bundle for Play upload
+#   ./termux-build.sh -- --stacktrace # anything after -- goes to gradlew
 #
 # Output: app/build/outputs/apk/debug/app-debug.apk
+#         app/build/outputs/apk/release/app-release.apk      (--release)
+#         app/build/outputs/bundle/release/app-release.aab   (--release --aab)
 #
 # Needs ~6 GB free in $HOME (SDK + Gradle distribution + Gradle caches) and a
 # couple of GB of RAM. The first build downloads Gradle 8.11.1 and every
@@ -32,6 +36,8 @@ BT_VERSION="35.0.0"          # AGP 8.9.2's default for compileSdk 36
 HEAP_MB=""
 ASSUME_YES=0
 DO_CLEAN=0
+BUILD_TYPE=debug
+WANT_AAB=0
 GRADLE_ARGS=()
 
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -40,7 +46,7 @@ die()  { printf '\033[1;31merror\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-Build rslvd's debug APK inside Termux (no PC, no proot, no emulation).
+Build rslvd's APK inside Termux (no PC, no proot, no emulation).
 
   ./termux-build.sh [options] [-- gradle-args...]
 
@@ -50,7 +56,13 @@ Options:
       --build-tools VER  SDK build-tools to install (default: 35.0.0)
       --heap MB          Gradle JVM heap (default: half of RAM, clamped 1024..3072)
       --clean            run `clean` before building
+      --release          build a release APK signed with keystore.properties
+      --aab              with --release: build the App Bundle Play wants
   -h, --help             this text
+
+Without --release this builds the debug APK. --release insists on a real
+keystore.properties (app/build.gradle would otherwise quietly sign with the
+debug key) and checks the result with apksigner before reporting success.
 
 The build is incremental and the setup steps are idempotent, so re-running the
 script after a `git pull` just rebuilds.
@@ -64,6 +76,8 @@ while (($#)); do
     --build-tools)  BT_VERSION=${2:?--build-tools needs a version}; shift ;;
     --heap)         HEAP_MB=${2:?--heap needs a number}; shift ;;
     --clean)        DO_CLEAN=1 ;;
+    --release)      BUILD_TYPE=release ;;
+    --aab)          BUILD_TYPE=release; WANT_AAB=1 ;;
     -h|--help)      usage; exit 0 ;;
     --)             shift; GRADLE_ARGS+=("$@"); break ;;
     *)              die "unknown option: $1 (try --help)" ;;
@@ -244,6 +258,66 @@ if ! grep -qx "sdk.dir=$SDK_DIR" "$local_props" 2>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
+# 3b. Release signing: keystore.properties (git-ignored, never written here)
+# ---------------------------------------------------------------------------
+
+if [[ $BUILD_TYPE == release ]]; then
+  signing_props=$PROJECT_DIR/keystore.properties
+
+  # app/build.gradle uses signingConfigs.debug when this file is absent, so an
+  # unsigned setup silently yields a release APK nobody can upload. Refuse early.
+  [[ -f $signing_props ]] || die "release builds need $PROJECT_DIR/keystore.properties, which is not there.
+
+  Generate an upload key (once, then back up the .jks somewhere safe):
+    keytool -genkeypair -v -keystore rslvd-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias rslvd -dname 'CN=rslvd.net, O=rslvd, C=US'
+  Then:  cp keystore.properties.example keystore.properties
+  and fill in storeFile=rslvd-upload.jks plus the two passwords.
+
+Both files are git-ignored. For the debug APK, drop --release."
+
+  for key in storeFile storePassword keyAlias keyPassword; do
+    grep -qE "^[[:space:]]*$key[[:space:]]*=[[:space:]]*[^[:space:]]" "$signing_props" \
+      || die "keystore.properties has no value for $key"
+  done
+
+  prop_value() {
+    sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$signing_props" \
+      | tail -1 | sed 's/[[:space:]]*$//; s/^"\(.*\)"$/\1/; s/^'"'"'\(.*\)'"'"'$/\1/'
+  }
+
+  store_file=$(prop_value storeFile)
+  if [[ $store_file == /* ]]; then
+    keystore_path=$store_file
+  else
+    keystore_path=$PROJECT_DIR/$store_file
+  fi
+  [[ -f $keystore_path ]] \
+    || die "keystore.properties says storeFile=$store_file, but that file is missing (looked for $keystore_path)"
+
+  # Gradle reads both passwords straight from the file, so they never appear on a
+  # command line, in ps, in shell history or in this script's output.
+  log "release key: $keystore_path (alias $(prop_value keyAlias))"
+
+  verify_signature() {
+    local apk=$1 certs dn fp
+    if [[ ! -e $BT_DIR/apksigner ]]; then
+      warn "no apksigner in build-tools ${BT_DIR##*/}; skipping the signature check"
+      return 0
+    fi
+    certs=$("$BT_DIR/apksigner" verify --print-certs "$apk" 2>&1) || die "apksigner could not verify $apk:
+$certs"
+    dn=$(printf '%s\n' "$certs" | sed -n 's/^Signer #1 certificate DN: //p' | head -1)
+    fp=$(printf '%s\n' "$certs" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
+    log "signed by: ${dn:-unknown signer}"
+    [[ -n $fp ]] && echo "  certificate SHA-256: $fp"
+    case $dn in
+      *"Android Debug"*)
+        die "that APK carries the Android debug signature, not your upload key — check storeFile in keystore.properties" ;;
+    esac
+  }
+fi
+
+# ---------------------------------------------------------------------------
 # 4. Build
 # ---------------------------------------------------------------------------
 
@@ -263,8 +337,16 @@ gradle_cmd=(
   "-Dorg.gradle.jvmargs=-Xmx${HEAP_MB}m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8"
   -Pkotlin.compiler.execution.strategy=in-process
 )
-(( DO_CLEAN )) && gradle_cmd+=(clean)
-gradle_cmd+=(:app:assembleDebug)
+if [[ $BUILD_TYPE == release ]]; then
+  if (( WANT_AAB )); then
+    TASK=:app:bundleRelease
+  else
+    TASK=:app:assembleRelease
+  fi
+else
+  TASK=:app:assembleDebug
+fi
+gradle_cmd+=("$TASK")
 ((${#GRADLE_ARGS[@]})) && gradle_cmd+=("${GRADLE_ARGS[@]}")
 
 log "building: ${gradle_cmd[*]}"
@@ -287,16 +369,48 @@ Build failed (gradlew exit $status). On a phone the usual causes:
   * Kotlin daemon died: it is already forced in-process; re-run with --heap 2048.
   * Gradle can't download: check the connection, then re-run — downloads resume.
 
-For the full traceback: ./gradlew --no-daemon :app:assembleDebug --stacktrace
+  * Release signing: "Keystore was tampered with, or password was incorrect" or
+    "No key with alias" means a wrong password/alias in keystore.properties, not
+    a broken keystore. A missing storeFile path is reported before Gradle runs.
+  * Release signing: keytool needs the same JDK (already on PATH here):
+      keytool -genkeypair -keystore rslvd-upload.jks -alias rslvd -keyalg RSA -keysize 2048 -validity 10000
+
+For the full traceback: ./gradlew --no-daemon $TASK --stacktrace
 EOF
   exit "$status"
 fi
 
-apk=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk
-[[ -f $apk ]] || die "Gradle reported success but $apk is missing"
-
-log "debug APK: $apk ($(du -h "$apk" | cut -f1))"
-sha256sum "$apk"
-echo
-echo "Install it by opening that file in a file manager, or:"
-echo "  adb install -r '$apk'          # wireless debugging / another machine"
+if [[ $BUILD_TYPE == release ]]; then
+  if (( WANT_AAB )); then
+    out=$PROJECT_DIR/app/build/outputs/bundle/release/app-release.aab
+    [[ -f $out ]] || die "Gradle reported success but $out is missing"
+    log "release bundle: $out ($(du -h "$out" | cut -f1))"
+    sha256sum "$out"
+    if command -v keytool >/dev/null 2>&1; then
+      keytool -printcert -jarfile "$out" 2>/dev/null \
+        | sed -n 's/^Owner: /  upload key: /p; s/^SHA256: /  SHA-256: /p' | head -2 \
+        || warn "could not read the bundle's signing certificate with keytool"
+    fi
+    echo
+    echo "Upload this .aab in Play Console (Testing or Production → Create new release)."
+    echo "Play re-signs the delivered APKs with your app signing key; this upload key only authenticates the upload."
+  else
+    out=$PROJECT_DIR/app/build/outputs/apk/release/app-release.apk
+    [[ -f $out ]] || die "Gradle reported success but $out is missing"
+    log "release APK: $out ($(du -h "$out" | cut -f1))"
+    sha256sum "$out"
+    verify_signature "$out"
+    echo
+    echo "Install it by opening that file in a file manager, or:"
+    echo "  adb install -r '$out'          # wireless debugging / another machine"
+  fi
+else
+  out=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk
+  [[ -f $out ]] || die "Gradle reported success but $out is missing"
+  log "debug APK: $out ($(du -h "$out" | cut -f1))"
+  sha256sum "$out"
+  echo
+  echo "Install it by opening that file in a file manager, or:"
+  echo "  adb install -r '$out'          # wireless debugging / another machine"
+  echo "For a signed release: ./termux-build.sh --release"
+fi
