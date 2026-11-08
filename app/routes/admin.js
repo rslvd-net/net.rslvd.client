@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../db/pool');
 const { requireAdmin, requireSiteOwner } = require('../middleware/auth');
 const settings = require('../lib/settings');
+const logbus = require('../lib/logbus');
 const activity = require('../lib/activity');
 
 // All admin routes require at least admin role (site_owner also passes)
@@ -134,6 +135,21 @@ router.get('/activity', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch activity' });
   }
+});
+
+// ── Live logs (site_owner only) ───────────────────────────────────────────────
+// What this process has logged since it started; the panel polls it while the
+// Logs tab is open. Owner only, because the output can name accounts and
+// internal hosts. Never cached anywhere.
+router.get('/logs', requireSiteOwner, (req, res) => {
+  const limit = Number.parseInt(req.query.limit, 10);
+  const level = String(req.query.level || 'all');
+  res.set('Cache-Control', 'no-store');
+  return res.json({
+    ...logbus.info(),
+    level,
+    entries: logbus.recent(Number.isFinite(limit) ? limit : 200, level),
+  });
 });
 
 // ── Reserved Subdomains (site_owner only) ─────────────────────────────────────

@@ -489,6 +489,7 @@ PATCH /api/admin/users/:id
 DELETE /api/admin/users/:id
 GET /api/admin/config      # deployment info + tunable settings
 PATCH /api/admin/config    # { "settings": { "donation_goal_cents": 3000 } }
+GET /api/admin/logs        # last N service log lines this run (owner only)
 ```
 
 ---
@@ -1037,6 +1038,7 @@ PATCH /api/admin/users/:id
 DELETE /api/admin/users/:id
 GET /api/admin/config      # deployment info + tunable settings
 PATCH /api/admin/config    # { "settings": { "donation_goal_cents": 3000 } }
+GET /api/admin/logs        # last N service log lines this run (owner only)
 ```
 
 ---

@@ -1,4 +1,7 @@
 require('dotenv').config();
+// Installed before anything else logs, so the owner's Logs tab sees boot output
+// too. Nothing else changes: console still prints to stdout as usual.
+require('./lib/logbus').install();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');

@@ -2192,6 +2192,129 @@ const EVENT_META = {
   'tunnel.key_register':  { icon: '🔐', color: 'var(--accent2)', label: 'Key registered' },
 };
 
+// ── Live logs ─────────────────────────────────────────────────────────────────
+const LOG_LEVELS = [
+  ['all', 'All levels'],
+  ['error', 'Errors'],
+  ['warn', 'Warnings'],
+  ['info', 'Info'],
+];
+
+function LiveLogViewer() {
+  const [entries, setEntries] = useState([]);
+  const [meta, setMeta] = useState(null);
+  const [level, setLevel] = useState('all');
+  const [paused, setPaused] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const pausedRef = useRef(false);
+  const boxRef = useRef(null);
+
+  const load = async () => {
+    try {
+      const data = await API.get(`/admin/logs?limit=300&level=${level}`);
+      if (pausedRef.current) return;
+      setEntries(data.entries || []);
+      setMeta({ startedAt: data.startedAt, kept: data.kept, capacity: data.capacity });
+      setError('');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, [level]);
+
+  useEffect(() => {
+    const box = boxRef.current;
+    if (box && autoScroll) box.scrollTop = box.scrollHeight;
+  }, [entries, autoScroll]);
+
+  const levelColor = (l) => l === 'error' ? 'var(--red)' : l === 'warn' ? 'var(--yellow, #eab308)' : 'var(--text2)';
+
+  return React.createElement('div', null,
+    React.createElement('div', { style: { display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' } },
+      React.createElement('select', { className: 'input', style: { maxWidth: 170 }, value: level, onChange: e => setLevel(e.target.value) },
+        LOG_LEVELS.map(([v, label]) => React.createElement('option', { key: v, value: v }, label))
+      ),
+      React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: () => setPaused(p => !p) }, paused ? '▶ Resume' : '⏸ Pause'),
+      React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: load, disabled: loading }, '↻ Refresh'),
+      React.createElement('label', { style: { display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: 'var(--text2)' } },
+        React.createElement('input', { type: 'checkbox', checked: autoScroll, onChange: e => setAutoScroll(e.target.checked) }),
+        'Follow tail'
+      ),
+      meta && React.createElement('span', { style: { marginLeft: 'auto', fontSize: 12, color: 'var(--text3)' } },
+        `${entries.length} of ${meta.kept} lines · since ${new Date(meta.startedAt).toLocaleTimeString()}`
+      )
+    ),
+    paused && React.createElement('p', { style: { fontSize: 12, color: 'var(--text3)', marginBottom: 8 } },
+      'Paused. New lines are still recorded; they show up when you resume.'
+    ),
+    error && React.createElement('p', { style: { fontSize: 13, color: 'var(--red)', marginBottom: 8 } }, `Could not load logs: ${error}`),
+    React.createElement('div', {
+      ref: boxRef,
+      style: {
+        background: '#0b0f17', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px',
+        height: '60vh', overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSize: 12.5, lineHeight: 1.55,
+      }
+    },
+      entries.length === 0
+        ? React.createElement('div', { style: { color: '#7d8799' } }, loading ? 'Loading…' : 'Nothing logged yet.')
+        : entries.map(e => React.createElement('div', { key: e.id, style: { display: 'flex', gap: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-word' } },
+          React.createElement('span', { style: { color: '#5d6779', flexShrink: 0 } }, new Date(e.ts).toLocaleTimeString()),
+          React.createElement('span', { style: { color: levelColor(e.level), flexShrink: 0, width: 44 } }, e.level),
+          React.createElement('span', { style: { color: '#d7dde8' } }, e.message)
+        ))
+    ),
+    React.createElement('p', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 10 } },
+      'Kept in memory for this run only: the last ' + (meta ? meta.capacity : 500) +
+      ' lines since the service started. Full history is in journalctl on the server.'
+    )
+  );
+}
+
+// A crash in one panel used to render the whole app blank. Catch it at the root
+// so the failure stays on screen, says what happened, and is recoverable.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error) {
+    console.error('UI crashed:', error);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return React.createElement('div', { className: 'flex-center', style: { minHeight: '100vh', flexDirection: 'column', gap: 14, padding: 24, textAlign: 'center' } },
+      React.createElement('h1', { style: { fontSize: 22 } }, 'This screen hit an error'),
+      React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, maxWidth: 520 } },
+        'The rest of the site is fine. Reload to try again, and tell support which button you clicked if it keeps happening.'
+      ),
+      React.createElement('pre', { style: { fontSize: 12, color: 'var(--text3)', maxWidth: 640, whiteSpace: 'pre-wrap' } },
+        String((this.state.error && this.state.error.message) || this.state.error)
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: 10 } },
+        React.createElement('button', { className: 'btn btn-primary', onClick: () => this.setState({ error: null }) }, 'Try again'),
+        React.createElement('button', { className: 'btn btn-secondary', onClick: () => window.location.reload() }, 'Reload page')
+      )
+    );
+  }
+}
+
 function ActivityLog({ logs, onRefresh }) {
   const [filter, setFilter] = useState('');
   const [eventFilter, setEventFilter] = useState('');
@@ -3869,4 +3992,6 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+ReactDOM.createRoot(document.getElementById('root')).render(
+  React.createElement(ErrorBoundary, null, React.createElement(App))
+);
