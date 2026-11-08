@@ -25,9 +25,9 @@ async function log(event, { userId = null, detail = null, req = null } = {}) {
     console.error('activity owner check error:', e.message);
   }
   try {
-    const ip = req
-      ? (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null)
-      : null;
+    // req.ip is resolved against the trusted proxy hop (server.js), so the
+    // recorded address is the real client and not a header the client chose.
+    const ip = req ? String(req.ip || '').replace(/^::ffff:/, '') || null : null;
     const ua = req ? (req.headers['user-agent'] || null) : null;
     await pool.query(
       `INSERT INTO activity_logs (user_id, event, detail, ip_address, user_agent)

@@ -6,6 +6,11 @@ const path = require('path');
 
 const app = express();
 
+// nginx terminates TLS on loopback and appends X-Forwarded-For there, so trust
+// exactly that one hop: req.ip becomes the real client address instead of
+// 127.0.0.1, and X-Forwarded-For values the client invented are ignored.
+app.set('trust proxy', 'loopback');
+
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.APP_URL }));
 
@@ -28,13 +33,27 @@ app.use('/api/dns-changes', require('./routes/dns-changes'));
 
 // Public IP detection for PWA DDNS auto-updater
 app.get('/api/ip', (req, res) => {
-  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+  // req.ip already honours the trusted proxy hop above; strip the IPv4-mapped
+  // prefix so the reply is directly usable as a DDNS address.
+  const ip = String(req.ip || '').replace(/^::ffff:/, '');
   res.json({ ip });
+});
+
+// Unmatched /api/* answers JSON, not the app shell, so a mistyped API call fails
+// where a client can see it.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Not found' });
 });
 
 // Serve React frontend
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+
+// SPA fallback: only browser navigations get the shell. Unknown paths and missing
+// assets answer a real 404 instead of a 200 that crawlers and API clients trust.
 app.get('/{*path}', (req, res) => {
+  if (!String(req.headers.accept || '').includes('text/html')) {
+    return res.status(404).type('txt').send('Not found');
+  }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

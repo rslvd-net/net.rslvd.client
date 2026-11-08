@@ -89,7 +89,9 @@ router.post('/', async (req, res) => {
 });
 
 function getClientIP(req) {
-  return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+  // req.ip resolves the one trusted proxy hop (server.js), so the client cannot
+  // choose its own address by sending X-Forwarded-For.
+  return String(req.ip || '').replace(/^::ffff:/, '') || req.socket.remoteAddress;
 }
 
 function isValidIPv4(ip) {

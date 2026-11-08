@@ -8,10 +8,11 @@ const pool = require('../db/pool');
 const activity = require('../lib/activity');
 const { sendMail } = require('../lib/mailer');
 const { isDonor, isOwner, limitsFor } = require('../lib/plans');
+const rateLimits = require('../middleware/rate-limit');
 
 const CURRENT_LEGAL_VERSION = '2026-05-31';
 
-router.post('/register', async (req, res) => {
+router.post('/register', rateLimits.registerByIp, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
@@ -71,7 +72,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', rateLimits.loginByIp, rateLimits.loginByEmail, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
@@ -177,7 +178,7 @@ router.post('/2fa/setup', require('../middleware/auth').requireAuth, async (req,
 });
 
 // ── 2FA: confirm code and activate ─────────────────────────────────────────────────
-router.post('/2fa/verify', require('../middleware/auth').requireAuth, async (req, res) => {
+router.post('/2fa/verify', require('../middleware/auth').requireAuth, rateLimits.accountAction, async (req, res) => {
   try {
     const { code } = req.body;
     if (!code) return res.status(400).json({ error: 'Code required' });
@@ -198,7 +199,7 @@ router.post('/2fa/verify', require('../middleware/auth').requireAuth, async (req
 });
 
 // ── 2FA: disable ────────────────────────────────────────────────────────────────────
-router.post('/2fa/disable', require('../middleware/auth').requireAuth, async (req, res) => {
+router.post('/2fa/disable', require('../middleware/auth').requireAuth, rateLimits.accountAction, async (req, res) => {
   try {
     const { password } = req.body;
     if (!password) return res.status(400).json({ error: 'Password required to disable 2FA' });
@@ -226,7 +227,7 @@ router.get('/activity', require('../middleware/auth').requireAuth, async (req, r
   }
 });
 
-router.post('/change-password', require('../middleware/auth').requireAuth, async (req, res) => {
+router.post('/change-password', require('../middleware/auth').requireAuth, rateLimits.accountAction, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both passwords required' });
@@ -244,7 +245,7 @@ router.post('/change-password', require('../middleware/auth').requireAuth, async
 });
 
 // ── Forgot password ───────────────────────────────────────────────────────────
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', rateLimits.forgotByIp, rateLimits.forgotByEmail, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
@@ -277,7 +278,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // ── Reset password ────────────────────────────────────────────────────────────
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', rateLimits.resetByIp, async (req, res) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ error: 'Token and new password required' });
@@ -326,7 +327,7 @@ router.get('/verify-email', async (req, res) => {
   }
 });
 
-router.post('/resend-verification', require('../middleware/auth').requireAuth, async (req, res) => {
+router.post('/resend-verification', require('../middleware/auth').requireAuth, rateLimits.resendVerificationByUser, async (req, res) => {
   try {
     const u = req.user;
     if (u.email_verified) return res.json({ ok: true, message: 'Email already verified' });

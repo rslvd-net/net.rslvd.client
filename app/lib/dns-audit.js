@@ -3,7 +3,8 @@ const pool = require('../db/pool');
 // Audit trail of DNS-affecting changes (record create/delete, IP updates,
 // HTTPS toggles). Fire-and-forget: never blocks or fails the calling request.
 function record({ userId = null, hostId = null, tunnelId = null, fqdn, recordType = null, change, oldValue = null, newValue = null, source = 'dashboard', req = null }) {
-  const ip = req ? ((req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress) : null;
+  // req.ip already accounts for the trusted proxy hop (server.js).
+  const ip = req ? String(req.ip || '').replace(/^::ffff:/, '') || null : null;
   const ua = req ? (req.headers['user-agent'] || '').slice(0, 500) : null;
   pool
     .query(

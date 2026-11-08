@@ -1,6 +1,6 @@
 // rslvd.privatedns.org Service Worker — offline shell + DDNS background sync
 
-const CACHE_NAME = 'rslvd-v3';
+const CACHE_NAME = 'rslvd-v4';
 const SHELL_ASSETS = [
   '/',
   '/app2.js',
@@ -29,27 +29,67 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// ── Fetch: network-first for API, cache-first for shell ─────────────────────
+// ── Fetch ───────────────────────────────────────────────────────────────────
+//
+// Nothing here may pin a user to an old build: sw.js is the only file a deploy
+// always replaces, so it has to be the thing that notices. Navigations go to the
+// network first, code refreshes in the background, and only images and icons are
+// served straight from the cache.
 
 self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
+  const { request } = e;
+  const url = new URL(request.url);
 
-  // API requests: always network
+  // API calls, uploads, non-GET requests and third-party assets stay untouched.
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
-  // App shell: cache-first, fallback to network
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetchPromise = fetch(e.request).then(response => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-        }
-        return response;
-      }).catch(() => cached);
+  // Pages: network first, so a deploy is picked up on the very next load, with
+  // the cached copy only covering offline use.
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    e.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then(cached => cached || caches.match('/')))
+    );
+    return;
+  }
 
-      return cached || fetchPromise;
-    })
+  // Code and styles: serve the cached copy immediately, replace it in the
+  // background, so the next load after a deploy runs the new bundle.
+  if (request.destination === 'script' || request.destination === 'style' || request.destination === 'worker') {
+    e.respondWith(
+      caches.match(request).then(cached => {
+        const revalidate = fetch(request)
+          .then(response => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || revalidate;
+      })
+    );
+    return;
+  }
+
+  // Images, fonts, manifest: cache first, filled on first use.
+  e.respondWith(
+    caches.match(request).then(cached => cached || fetch(request).then(response => {
+      if (response.ok) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+      }
+      return response;
+    }))
   );
 });
 

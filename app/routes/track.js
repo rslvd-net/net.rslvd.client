@@ -5,11 +5,15 @@ const activity = require('../lib/activity');
 
 const router = express.Router();
 
+// req.ip is resolved against the trusted proxy hop in server.js, so this cannot be
+// forged by sending an X-Forwarded-For header.
+const { ipKeyGenerator } = rateLimit;
+
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
   validate: { xForwardedForHeader: false, ip: false, trustProxy: false, default: false },
-  keyGenerator: (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
 });
 
 // Resolves the user id from a Bearer token if present; anonymous otherwise.
