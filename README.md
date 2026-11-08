@@ -48,7 +48,7 @@ Check it out: https://rslvd.privatedns.org/
 
 - **🌐 Dynamic DNS** - Automatic IP updates via HTTP API, compatible with any DynDNS client
 - **🚇 CGNAT Tunnels** - TCP tunnels that work behind carrier-grade NAT without port forwarding
-- **🛰️ Remote Access (premium)** - SSH and ADB tunnels that publish a real TCP port (20000-29999) on the server, so `ssh -p PORT user@name.rslvd.net` and `adb connect name.rslvd.net:PORT` work from anywhere. Requires any paid plan
+- **🛰️ Remote Access (premium)** - SSH and ADB tunnels that publish a real TCP port (20000-29999) on the server, so `ssh -p PORT user@name.rslvd.net` and `ssh -p PORT user@name.rslvd.net` / `adb connect name.rslvd.net:PORT` work from anywhere. Requires any paid plan
 - **📡 UDP Tunnels** - DNS, VoIP, and game servers
 - **🔒 Free SSL Certificates** - Automatic Let's Encrypt integration
 - **💳 Subscription Billing** - Square integration with multiple pricing tiers
@@ -269,6 +269,35 @@ APP_URL=https://example.com
 SERVER_IP=your_server_ip
 ```
 
+### Runtime settings
+
+The site owner gets a **Settings** tab in the admin panel (`/admin` → ⚙️ Settings).
+It edits whole numbers only and applies them on the next request — no restart,
+no deploy. Stored in the `app_settings` table; a missing row means "use the
+default" from `app/lib/settings.js`.
+
+| Group | Settings |
+|-------|----------|
+| Donations | monthly goal (cents), minimum and maximum donation (cents), donor days per donation |
+| Free plan | free hostnames, free general tunnels, free SSH tunnels, free ADB tunnels |
+| Rate limits | sign-in attempts per address and per account, sign-ups, password-reset requests and submissions, 2FA/password checks, verification emails |
+| Support & beta | AI support replies (1/0), Android beta tester slots |
+
+Deliberately **not** editable in the panel: anything that is free text —
+credentials, API keys, `BASE_DOMAIN`, `APP_URL`, `SERVER_IP`, SMTP settings.
+Those stay in `/opt/rslvd/.env` so a web session can never rewrite them.
+`SUPPORT_AI=false` in the environment still overrides the panel switch.
+
+```bash
+# Read everything (deployment block + settings with min/max/default)
+curl -H "Authorization: Bearer $TOKEN" https://example.com/api/admin/config
+
+# Change one value (integers only; out-of-range or non-numeric answers 400)
+curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"settings":{"donation_goal_cents":3000,"free_adb_tunnels":0}}' \
+  https://example.com/api/admin/config
+```
+
 ### Site Admin Account
 
 ```bash
@@ -423,8 +452,8 @@ rslvd-tunnel -ssh TOKEN 22      # exposes local SSH
 rslvd-tunnel -adb TOKEN 5555    # exposes a device's adbd (adb tcpip 5555)
 rslvd-tunnel -adb TOKEN 5037    # exposes a PC's adb server
 
-ssh -p <public_port> user@rslvd.net
-adb connect rslvd.net:<public_port>
+ssh -p <public_port> user@<tunnel-subdomain>   # e.g. user@myserver.rslvd.net
+adb connect <tunnel-subdomain>:<public_port>   # e.g. adb connect termux-adb.rslvd.net:20002
 ```
 
 Any active paid plan or a site-owner/admin account unlocks remote access; free plans
@@ -458,6 +487,8 @@ GET /api/admin/tunnels
 GET /api/admin/activity
 PATCH /api/admin/users/:id
 DELETE /api/admin/users/:id
+GET /api/admin/config      # deployment info + tunable settings
+PATCH /api/admin/config    # { "settings": { "donation_goal_cents": 3000 } }
 ```
 
 ---
@@ -969,8 +1000,8 @@ rslvd-tunnel -ssh TOKEN 22      # exposes local SSH
 rslvd-tunnel -adb TOKEN 5555    # exposes a device's adbd (adb tcpip 5555)
 rslvd-tunnel -adb TOKEN 5037    # exposes a PC's adb server
 
-ssh -p <public_port> user@rslvd.net
-adb connect rslvd.net:<public_port>
+ssh -p <public_port> user@<tunnel-subdomain>   # e.g. user@myserver.rslvd.net
+adb connect <tunnel-subdomain>:<public_port>   # e.g. adb connect termux-adb.rslvd.net:20002
 ```
 
 Any active paid plan or a site-owner/admin account unlocks remote access; free plans
@@ -1004,6 +1035,8 @@ GET /api/admin/tunnels
 GET /api/admin/activity
 PATCH /api/admin/users/:id
 DELETE /api/admin/users/:id
+GET /api/admin/config      # deployment info + tunable settings
+PATCH /api/admin/config    # { "settings": { "donation_goal_cents": 3000 } }
 ```
 
 ---

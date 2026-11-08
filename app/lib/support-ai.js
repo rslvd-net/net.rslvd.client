@@ -1,20 +1,32 @@
 const pool = require('../db/pool');
 const { notifyAdmin } = require('./notify');
+const settings = require('./settings');
+const { DONATION, FREE_LIMITS } = require('./plans');
 
 // AI-first support: a self-hosted Ollama model answers tickets, and the ticket
 // escalates to the site owner when the AI can't help, fails, or the user asks.
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const MODEL = process.env.SUPPORT_AI_MODEL || 'llama3.2:1b';
-const ENABLED = process.env.SUPPORT_AI !== 'false';
 const TIMEOUT_MS = 120_000;
 
-const SYSTEM_PROMPT = `You are the support assistant for rslvd.privatedns.org, a Dynamic DNS (DDNS) and tunneling service.
+/**
+ * The facts the model is given change when the site owner edits the donation
+ * terms or free allowances in the admin panel, so the prompt is rebuilt per
+ * reply instead of being frozen at import time.
+ */
+function systemPrompt() {
+  const free = FREE_LIMITS;
+  const freeRemote = free.remote.ssh + free.remote.adb;
+  const donorTerm = DONATION.donorDays % 30 === 0
+    ? `${DONATION.donorDays / 30} month${DONATION.donorDays === 30 ? '' : 's'}`
+    : `${DONATION.donorDays} days`;
+  return `You are the support assistant for rslvd.privatedns.org, a Dynamic DNS (DDNS) and tunneling service.
 
 Facts about rslvd.privatedns.org:
 - Users get permanent subdomains like yourname.rslvd.privatedns.org that point at their home IP (DDNS), and reverse tunnels that expose local services even behind CGNAT (no port forwarding needed).
-- Free accounts: 2 hostnames, 2 tunnels, plus one SSH and one ADB tunnel (counted separately, so 4 tunnels total), no nesting. Donor access (donation only, no subscriptions): unlimited hostnames and tunnels, unlimited SSH/ADB tunnels, and nested subdomains like api.yourname.rslvd.privatedns.org.
-- Donations: any donation (minimum $1) grants 3 months of donor access. Donating again extends the window. The monthly goal is $22.50.
+- Free accounts: ${free.maxHosts} hostnames, ${free.maxTunnels} tunnels, plus ${free.remote.ssh} SSH and ${free.remote.adb} ADB tunnel (counted separately, so ${free.maxHosts + free.maxTunnels + freeRemote} tunnels total), no nesting. Donor access (donation only, no subscriptions): unlimited hostnames and tunnels, unlimited SSH/ADB tunnels, and nested subdomains like api.yourname.rslvd.privatedns.org.
+- Donations: any donation (minimum ${settings.money(DONATION.minCents)}) grants ${donorTerm} of donor access. Donating again extends the window. The monthly goal is ${settings.money(DONATION.goalCents)}.
 - DDNS updates use the standard DynDNS protocol: GET https://rslvd.privatedns.org/api/update?key=UPDATE_KEY&ip=1.2.3.4 (responses: good, nochg, badauth). Works with ddclient, routers (DD-WRT/OpenWrt), and the rslvd apps.
 - Each hostname has an Update Key (shown on the host card, can be regenerated). Each tunnel has a connect token.
 - Tunnels: run "rslvd-tunnel TOKEN LOCAL_PORT" (download at rslvd.privatedns.org/downloads), or use the Android app's built-in tunnel client. Protocols: TCP (default), UDP (-udp), plus remote access: SSH (-ssh TOKEN 22) and ADB (-adb TOKEN 5555), which publish a real public TCP port (20000-29999) on the server so you connect with "ssh -p PORT user@yourname.rslvd.net" or "adb connect yourname.rslvd.net:PORT". Free accounts include one SSH and one ADB tunnel; donors get unlimited.
@@ -29,8 +41,15 @@ Rules:
 - Never invent features, prices, or promises. Never ask for passwords, update keys, tokens, or payment details.
 - If you are not confident you can solve the problem (billing disputes, refunds, account recovery, deleting data, bugs, outages), say so and tell the user to press the "Escalate to a human" button so the site owner can help.
 - Always end with a short note that they can press "Escalate to a human" if your answer didn't solve it.`;
+}
 
-function configured() { return ENABLED; }
+/**
+ * On unless the site owner switched it off in the panel. The environment
+ * variable SUPPORT_AI=false overrides the panel and disables it for good.
+ */
+function configured() {
+  return process.env.SUPPORT_AI !== 'false' && settings.get('support_ai_enabled') === 1;
+}
 
 async function chat(messages) {
   const controller = new AbortController();
@@ -42,7 +61,7 @@ async function chat(messages) {
       body: JSON.stringify({
         model: MODEL,
         stream: false,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+        messages: [{ role: 'system', content: systemPrompt() }, ...messages],
         options: { num_predict: 400, temperature: 0.3 },
       }),
       signal: controller.signal,

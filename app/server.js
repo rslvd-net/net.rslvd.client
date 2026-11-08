@@ -67,5 +67,12 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, async () => {
   console.log(`rslvd.privatedns.org DDNS server running on port ${PORT}`);
   await require('./db/migrate').run();
+  try {
+    await require('./lib/settings').load();
+    console.log('Settings loaded');
+  } catch (err) {
+    // Defaults stay in place, so the app keeps serving with stock values.
+    console.error('Settings load failed, using defaults:', err.message);
+  }
   require('./lib/tunnel-proxy').startTunnelProxy();
 });

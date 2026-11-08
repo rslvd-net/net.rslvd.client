@@ -164,7 +164,7 @@ function Landing({ navigate }) {
     { icon: '🔗', title: 'DynDNS Compatible', desc: 'Drop-in replacement for any DynDNS client. Works with Asus, Synology, Ubiquiti, pfSense, and more.' },
     { icon: '🔒', title: 'Token Security', desc: 'Each host and tunnel gets its own unique token. Revoke or rotate instantly from your dashboard.' },
     { icon: '📱', title: 'Every Platform', desc: 'Single binary for Linux, macOS, Windows, Android (Termux), and routers. No dependencies, no runtime.' },
-    { icon: '🛰', title: 'Remote ADB & SSH', desc: 'Raw-port tunnels put a real TCP port on rslvd.net for adb connect, ssh -p, RDP and more — one SSH and one ADB free, unlimited for donors.' },
+    { icon: '🛰', title: 'Remote ADB & SSH', desc: 'Raw-port tunnels put a real TCP port behind your own subdomain for adb connect, ssh -p, RDP and more — one SSH and one ADB free, unlimited for donors.' },
     { icon: '⚡', title: 'Instant Setup', desc: 'Register, grab your token, run one command. Your tunnel is live in under 30 seconds.' },
   ];
 
@@ -173,7 +173,7 @@ function Landing({ navigate }) {
     { icon: '💻', title: 'Dev & Testing', desc: 'Share a localhost dev server with a client or teammate instantly. No VPN, no ngrok account, no bandwidth limits.' },
     { icon: '📹', title: 'IP Cameras & NVRs', desc: 'Access your cameras remotely without a static IP. Point rslvd.privatedns.org at your NVR and you\'re done.' },
     { icon: '🌍', title: 'Remote Access', desc: 'SSH, RDP, VNC — tunnel any protocol. Access your home PC or office server from anywhere.' },
-    { icon: '🛰', title: 'ADB & SSH Tunnels', desc: 'Raw-port tunnels give you rslvd.net:<port> — one SSH and one ADB free, so you can adb connect to a phone or ssh into a box behind CGNAT from anywhere.' },
+    { icon: '🛰', title: 'ADB & SSH Tunnels', desc: 'Raw-port tunnels give you your-subdomain.rslvd.net:<port> — one SSH and one ADB free, so you can adb connect to a phone or ssh into a box behind CGNAT from anywhere.' },
   ];
 
   const faqs = [
@@ -181,7 +181,7 @@ function Landing({ navigate }) {
     { q: 'How is this different from ngrok?', a: 'rslvd.privatedns.org gives you a permanent subdomain (not a random URL), supports WebSockets, works on routers and Android, has no session time limits, and costs a fraction of the price.' },
     { q: 'Does the tunnel support HTTPS?', a: 'Yes. All tunnels are served over HTTPS via *.rslvd.privatedns.org — our wildcard SSL certificate covers every subdomain. Your traffic is encrypted end-to-end from browser to server.' },
     { q: 'Can I run multiple tunnels?', a: 'Yes. Free accounts get 2 tunnels; donors get unlimited tunnels. Each tunnel gets its own subdomain and token.' },
-    { q: 'Can I reach my phone or SSH server from anywhere?', a: 'Yes. Free accounts include one SSH and one ADB tunnel and donors get unlimited: SSH (-ssh) and ADB (-adb) tunnels publish a real TCP port on rslvd.net, so from any machine you can run "adb connect rslvd.net:<port>" or "ssh -p <port> user@rslvd.net". Perfect for a home server or an Android device behind CGNAT.' },
+    { q: 'Can I reach my phone or SSH server from anywhere?', a: 'Yes. Free accounts include one SSH and one ADB tunnel and donors get unlimited: SSH (-ssh) and ADB (-adb) tunnels publish a real TCP port under the tunnel\u2019s own subdomain, so from any machine you can run "adb connect myphone.rslvd.net:<port>" or "ssh -p <port> user@myserver.rslvd.net" — nested names like adb.termux.rslvd.net work too. Perfect for a home server or an Android device behind CGNAT.' },
     { q: 'Does it work on OpenWRT / DD-WRT?', a: 'Yes — dedicated one-line installers for both. Auto-detects your router\'s architecture (MIPS, ARM, x86) and persistent storage location.' },
   ];
 
@@ -741,7 +741,19 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels, existingHosts 
     if (REMOTE_PROTOCOLS.includes(p)) acc[p] = (acc[p] || 0) + 1;
     return acc;
   }, {});
-  const remoteBlocked = (p) => !remoteOk && (remoteUsed[p] || 0) >= (FREE_REMOTE[p] || 0);
+  // Free remote quotas are admin settings, so ask the server instead of trusting
+  // the compiled-in defaults, which remain as a fallback until it answers.
+  const [remoteCfg, setRemoteCfg] = useState(null);
+  useEffect(() => {
+    API.get('/tunnels/remote-access').then(setRemoteCfg).catch(() => {});
+  }, []);
+  const remoteQuota = (p) => {
+    const api = remoteCfg && Array.isArray(remoteCfg.protocols)
+      ? remoteCfg.protocols.find(x => x.key === p)
+      : null;
+    return api && Number.isInteger(api.quota) ? api.quota : (FREE_REMOTE[p] || 0);
+  };
+  const remoteBlocked = (p) => !remoteOk && (remoteUsed[p] || 0) >= remoteQuota(p);
   const [isNested, setIsNested] = useState(false);
   const [parentId, setParentId] = useState('');
   const [error, setError] = useState('');
@@ -753,6 +765,9 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels, existingHosts 
     ...(existingHosts || []).filter(h => !h.parent_host_id).map(h => ({ key: `host:${h.id}`, label: `Host: ${h.fqdn}`, fqdn: h.fqdn })),
   ];
   const BASE = 'rslvd.privatedns.org';
+  // Parent tunnels feed the nesting picker. This used to be undefined here, which
+  // threw as soon as a donor or owner opened the modal and blanked the whole app.
+  const topLevelTunnels = (existingTunnels || []).filter(t => !t.parent_tunnel_id);
 
   const selectedParent = parentOptions.find(p => p.key === parentId);
   const fqdnPreview = name
@@ -856,13 +871,13 @@ function TunnelModal({ onClose, onCreated, user, existingTunnels, existingHosts 
           }, p.label + (p.remote && remoteBlocked(p.key) ? ' 🔒' : '')))
         ),
         showUpgrade && React.createElement('div', { className: 'alert alert-info', style: { marginTop: 10, marginBottom: 0 } },
-          '🔒 Free accounts include one SSH and one ADB tunnel — you already have both. Delete one, or donate for unlimited raw-port tunnels on rslvd.net (public ports 20000-29999).'
+          '🔒 Your free SSH/ADB allowance for this protocol is used up. Delete the tunnel, or donate for unlimited raw-port tunnels (public ports 20000-29999).'
         ),
         React.createElement('p', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 6 } },
           protocol === 'tcp' && 'Works with HTTP, HTTPS, WebSockets, SSH, RDP — any TCP protocol.',
           protocol === 'udp' && 'For DNS servers, VoIP, game servers, or any UDP application. Requires UDP-compatible client.',
-          protocol === 'ssh' && 'Publishes rslvd.net:<port> straight to your SSH daemon. Connect with: ssh -p <port> <user>@rslvd.net',
-          protocol === 'adb' && 'Publishes rslvd.net:<port> to a phone\u2019s adb (5555) or a PC\u2019s adb server (5037). Connect with: adb connect rslvd.net:<port>'
+          protocol === 'ssh' && `Publishes a real port behind your own subdomain: ssh -p <port> <user>@${fqdnPreview || 'your-subdomain'}`,  
+          protocol === 'adb' && `Publishes a real port behind your own subdomain: adb connect ${fqdnPreview || 'your-subdomain'}:<port> \u2014 the port is assigned when you create the tunnel`
         )
       ),
 
@@ -931,7 +946,9 @@ function TunnelRow({ tunnel: t, onDelete, onHttpsToggle, isNested }) {
   const publicUrl = `${useHttps ? 'https' : 'http'}://${fqdn}`;
   const localHost = t.target_host || 'localhost';
   const remote = isRemoteProtocol(protocol);
-  const remoteHost = t.remote_host || 'rslvd.net';
+  // The server hands back the tunnel's own subdomain as the remote host, so the
+  // endpoint is name.rslvd.net:PORT (or adb.name.rslvd.net:PORT), not the base domain.
+  const remoteHost = t.remote_host || fqdn;
   const remotePort = t.remote_port || t.tunnel_port;
   const remoteEndpoint = `${remoteHost}:${remotePort || '<port>'}`;
   const remoteConnectCmd = protocol === 'ssh'
@@ -1716,8 +1733,8 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
           ),
           React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, margin: 0 } },
             hasRemoteAccess(user)
-              ? 'Create an SSH or ADB tunnel and it gets a real public port on rslvd.net (20000-29999): connect with "ssh -p <port> <user>@rslvd.net" or "adb connect rslvd.net:<port>".'
-              : 'SSH and ADB tunnels publish a real public port on rslvd.net so you can reach a machine — or a phone — behind CGNAT from anywhere. One of each is free; a donation makes it unlimited.'
+              ? 'Each SSH or ADB tunnel gets a real public port (20000-29999) behind its own subdomain: "ssh -p <port> <user>@myserver.rslvd.net" or "adb connect myphone.rslvd.net:<port>". Nested names work too — adb.termux.rslvd.net:<port>.'
+              : 'SSH and ADB tunnels publish a real public port under your own subdomain, so you can reach a machine — or a phone — behind CGNAT from anywhere. One of each is free; a donation makes it unlimited.'
           ),
           React.createElement('button', {
             className: 'btn btn-primary btn-sm', style: { marginTop: 10 }, onClick: () => setTab('billing')
@@ -1797,6 +1814,125 @@ function Dashboard({ user, navigate, refreshUser, pwa }) {
 
     showAddHost && React.createElement(AddHostModal, { onClose: () => setShowAddHost(false), onCreated: onHostCreated, user, existingHosts: hosts, existingTunnels: tunnels }),
     showAddTunnel && React.createElement(TunnelModal, { onClose: () => setShowAddTunnel(false), onCreated: onTunnelCreated, user, existingTunnels: tunnels, existingHosts: hosts })
+  );
+}
+
+// ── Settings Panel (site owner) ───────────────────────────────────────────────
+// Integers only on purpose: credentials, domains, URLs and other free text live
+// in the server's .env file, which a web session must never be able to rewrite.
+function SettingsPanel() {
+  const [config, setConfig] = useState(null);
+  const [values, setValues] = useState({});
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const applyConfig = (data) => {
+    setConfig(data);
+    setValues(Object.fromEntries(data.settings.map(s => [s.key, String(s.value)])));
+  };
+
+  const load = async () => {
+    setError('');
+    try { applyConfig(await API.get('/admin/config')); }
+    catch (e) { setError(e.message); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const payload = {};
+      for (const s of config.settings) {
+        const n = Number(String(values[s.key]).trim());
+        if (!Number.isInteger(n)) throw new Error(`${s.label} must be a whole number`);
+        payload[s.key] = n;
+      }
+      const res = await API.patch('/admin/config', { settings: payload });
+      applyConfig({ ...config, settings: res.settings });
+      setNotice('Saved. The new values are already in effect — no restart needed.');
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  if (!config) {
+    return error
+      ? React.createElement(Alert, null, error)
+      : React.createElement('div', { className: 'flex-center', style: { padding: 40 } }, React.createElement(Spinner));
+  }
+
+  // Grouped for display, keeping the order the server sends.
+  const groups = [];
+  for (const s of config.settings) {
+    const found = groups.find(g => g.name === s.group);
+    if (found) found.items.push(s);
+    else groups.push({ name: s.group, items: [s] });
+  }
+
+  const helper = (s) => {
+    const parts = [];
+    const n = Number(values[s.key]);
+    if (s.key.endsWith('_cents') && Number.isFinite(n)) parts.push(`= $${(n / 100).toFixed(2)}`);
+    if (s.help) parts.push(s.help);
+    parts.push(`Range ${s.min}–${s.max}, default ${s.default}.`);
+    return parts.join(' · ');
+  };
+
+  const deployment = config.deployment || {};
+  const deployRows = [
+    ['Base domain', deployment.base_domain || '—'],
+    ['App URL', deployment.app_url || '—'],
+    ['Server IP', deployment.server_ip || '—'],
+    ['Node env', deployment.node_env || '—'],
+    ['Square billing', deployment.square_configured ? 'configured' : 'not configured'],
+    ['IONOS DNS', deployment.ionos_configured ? 'configured' : 'not configured'],
+    ['Support AI', deployment.support_ai_env_off ? 'disabled by SUPPORT_AI env' : 'controlled by the setting below'],
+  ];
+
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'card mb-4' },
+      React.createElement('h3', { style: { marginBottom: 4 } }, '⚙️ Settings'),
+      React.createElement('p', { style: { color: 'var(--text2)', fontSize: 13, margin: 0 } },
+        'Whole numbers only, applied on the next request. Secrets, domains and URLs are not editable here — they stay in the server environment, where only someone with server access can change them.'
+      )
+    ),
+
+    error && React.createElement(Alert, null, error),
+    notice && React.createElement(Alert, { type: 'info' }, notice),
+
+    groups.map(g => React.createElement('div', { key: g.name, className: 'card mb-4' },
+      React.createElement('h4', { style: { marginBottom: 14, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--accent2)' } }, g.name),
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18 } },
+        g.items.map(s => React.createElement('div', { key: s.key, className: 'form-group', style: { margin: 0, minWidth: 0 } },
+          React.createElement('label', { className: 'form-label' }, s.label),
+          React.createElement('input', {
+            className: 'input', type: 'number', step: 1, min: s.min, max: s.max,
+            value: values[s.key] === undefined ? '' : values[s.key],
+            onChange: e => setValues(v => ({ ...v, [s.key]: e.target.value })),
+          }),
+          React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)', marginTop: 5, lineHeight: 1.5 } }, helper(s))
+        ))
+      )
+    )),
+
+    React.createElement('div', { style: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 24, flexWrap: 'wrap' } },
+      React.createElement('button', { className: 'btn btn-primary', onClick: save, disabled: saving },
+        saving ? React.createElement(Spinner) : 'Save settings'
+      ),
+      React.createElement('button', { className: 'btn btn-secondary', onClick: load, disabled: saving }, 'Reset to saved')
+    ),
+
+    React.createElement('div', { className: 'card' },
+      React.createElement('h4', { style: { marginBottom: 4, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--accent2)' } }, 'Deployment (read-only)'),
+      React.createElement('p', { style: { color: 'var(--text3)', fontSize: 12, marginBottom: 14 } },
+        'Values read from the server environment. Change them on the host and restart the service.'
+      ),
+      deployRows.map(([k, v]) => React.createElement('div', { key: k, className: 'flex-between', style: { fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)' } },
+        React.createElement('span', { style: { color: 'var(--text2)' } }, k),
+        React.createElement('code', { style: { fontSize: 12 } }, v)
+      ))
+    )
   );
 }
 
@@ -1887,13 +2023,13 @@ function AdminDashboard({ user, navigate }) {
     // Tabs
     React.createElement('div', { style: { display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid var(--border)', flexWrap: 'wrap' } },
       (isSiteOwner
-        ? ['overview', 'users', 'hosts', 'tunnels', 'activity', 'logs', 'reserved', 'backup']
+        ? ['overview', 'users', 'hosts', 'tunnels', 'activity', 'logs', 'reserved', 'settings', 'backup']
         : ['overview', 'users', 'hosts', 'tunnels', 'activity', 'logs']
       ).map(t =>
         React.createElement('button', {
           key: t, onClick: () => setTab(t),
           style: { padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 500, fontFamily: 'Inter, sans-serif', color: tab === t ? 'var(--text)' : 'var(--text2)', borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent', marginBottom: -1 }
-        }, t === 'reserved' ? '🔒 Reserved' : t === 'activity' ? '📋 Activity' : t === 'logs' ? '📜 Logs' : t === 'backup' ? '💾 Backup' : t.charAt(0).toUpperCase() + t.slice(1))
+        }, t === 'reserved' ? '🔒 Reserved' : t === 'activity' ? '📋 Activity' : t === 'logs' ? '📜 Logs' : t === 'backup' ? '💾 Backup' : t === 'settings' ? '⚙️ Settings' : t.charAt(0).toUpperCase() + t.slice(1))
       )
     ),
 
@@ -2028,6 +2164,9 @@ function AdminDashboard({ user, navigate }) {
 
     // Backup tab
     tab === 'backup' && isSiteOwner && React.createElement(BackupPanel),
+
+    // Settings tab
+    tab === 'settings' && isSiteOwner && React.createElement(SettingsPanel),
 
     // Edit user modal
     editUser && React.createElement(EditUserModal, {

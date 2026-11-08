@@ -1,20 +1,28 @@
+const settings = require('./settings');
+
 // Donation-only model. There are no subscriptions. Any donation grants donor
-// access for a flat term of DONOR_DAYS (3 months).
+// access for a flat term of donation_donor_days (3 months by default).
+//
+// These are getters rather than constants so the site owner can change the
+// donation terms and free allowances from the admin panel and have them apply
+// to the next request. Defaults live in lib/settings.js.
 const DONATION = {
-  minCents: 100,
-  maxCents: 20000,
-  goalCents: 2250,
-  donorDays: 90,
+  get minCents() { return settings.get('donation_min_cents'); },
+  get maxCents() { return settings.get('donation_max_cents'); },
+  get goalCents() { return settings.get('donation_goal_cents'); },
+  get donorDays() { return settings.get('donation_donor_days'); },
 };
 
 // Free accounts get FREE_LIMITS.maxHosts hostnames and FREE_LIMITS.maxTunnels
-// general (tcp/udp) tunnels, plus one raw-port tunnel per protocol in
-// FREE_LIMITS.remote — currently one SSH and one ADB. The remote ones are
+// general (tcp/udp) tunnels, plus a raw-port allowance per protocol in
+// FREE_LIMITS.remote — one SSH and one ADB by default. The remote ones are
 // counted separately, so a free account can hold 2 + 1 + 1 = 4 tunnels.
 const FREE_LIMITS = {
-  maxHosts: 2,
-  maxTunnels: 2,
-  remote: { ssh: 1, adb: 1 },
+  get maxHosts() { return settings.get('free_max_hosts'); },
+  get maxTunnels() { return settings.get('free_max_tunnels'); },
+  get remote() {
+    return { ssh: settings.get('free_ssh_tunnels'), adb: settings.get('free_adb_tunnels') };
+  },
 };
 
 const UNLIMITED = 999999;

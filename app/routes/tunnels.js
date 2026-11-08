@@ -21,14 +21,23 @@ const LABEL_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 const ALLOWED_PROTOCOLS = ['tcp', 'udp', 'ssh', 'adb'];
 const SERVER_HOST = () => process.env.BASE_DOMAIN || 'rslvd.net';
 
-/** Attach the public endpoint of a remote-access (SSH/ADB) tunnel to an API row. */
+/**
+ * Attach the public endpoint of a remote-access (SSH/ADB) tunnel to an API row.
+ *
+ * The host is the tunnel's own subdomain (an A record that already points at
+ * this server), not the bare base domain, so clients connect to
+ * name.rslvd.net:PORT — and nested tunnels to adb.name.rslvd.net:PORT — with the
+ * port taken from the tunnel record.
+ */
 function withRemoteMeta(t) {
   const remote = isRemoteProtocol(t.protocol);
+  const host = t.fqdn || SERVER_HOST();
   return {
     ...t,
     is_remote: remote,
-    remote_host: remote ? SERVER_HOST() : null,
+    remote_host: remote ? host : null,
     remote_port: remote ? t.tunnel_port : null,
+    remote_endpoint: remote ? `${host}:${t.tunnel_port}` : null,
   };
 }
 
@@ -242,7 +251,7 @@ router.post('/', async (req, res) => {
     // SSH/ADB tunnels are raw TCP — no HTTPS fallback and no SSL cert needed
     if (!remote && !wantHttps) tunnelCert.enableHttpFallback(fqdn);
 
-    activity.log('tunnel.create', { userId: user.id, detail: remote ? `${fqdn} (${protocolKey} → ${SERVER_HOST()}:${remotePort})` : fqdn, req });
+    activity.log('tunnel.create', { userId: user.id, detail: remote ? `${fqdn} (${protocolKey} → ${fqdn}:${remotePort})` : fqdn, req });
     dnsAudit.record({ userId: user.id, tunnelId: result.rows[0].id, fqdn, change: 'tunnel_created', req });
     res.status(201).json(withRemoteMeta(result.rows[0]));
   } catch (err) {

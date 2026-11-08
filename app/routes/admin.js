@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const pool = require('../db/pool');
 const { requireAdmin, requireSiteOwner } = require('../middleware/auth');
+const settings = require('../lib/settings');
+const activity = require('../lib/activity');
 
 // All admin routes require at least admin role (site_owner also passes)
 router.use(requireAdmin);
@@ -188,16 +190,39 @@ router.patch('/reserved/:id', requireSiteOwner, async (req, res) => {
   }
 });
 
-// ── Server config (site_owner only) ──────────────────────────────────────────
-router.get('/config', requireSiteOwner, async (req, res) => {
+// ── Server config + tunable settings (site_owner only) ───────────────────────
+// Deployment values are read-only here: credentials, domains and URLs live in
+// the environment file and must not be editable from a web session. Everything
+// under `settings` is an integer the owner can change, and takes effect on the
+// next request.
+router.get('/config', requireSiteOwner, (req, res) => {
   res.json({
-    base_domain: process.env.BASE_DOMAIN,
-    app_url: process.env.APP_URL,
-    server_ip: process.env.SERVER_IP || '129.146.61.187',
-    node_env: process.env.NODE_ENV,
-    square_configured: !!process.env.SQUARE_ACCESS_TOKEN,
-    ionos_configured: !!process.env.IONOS_API_KEY,
+    deployment: {
+      base_domain: process.env.BASE_DOMAIN,
+      app_url: process.env.APP_URL,
+      server_ip: process.env.SERVER_IP || '129.146.61.187',
+      node_env: process.env.NODE_ENV,
+      square_configured: !!process.env.SQUARE_ACCESS_TOKEN,
+      ionos_configured: !!process.env.IONOS_API_KEY,
+      support_ai_env_off: process.env.SUPPORT_AI === 'false',
+    },
+    settings: settings.list(),
   });
+});
+
+router.patch('/config', requireSiteOwner, async (req, res) => {
+  try {
+    const updates = req.body && req.body.settings ? req.body.settings : req.body;
+    const updated = await settings.update(updates, req.user.id);
+    activity.log('admin.settings', {
+      userId: req.user.id,
+      detail: Object.keys(updates || {}).join(', ').slice(0, 500),
+      req,
+    });
+    res.json({ success: true, settings: updated });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Failed to save settings' });
+  }
 });
 
 // ── Backup / Restore (site_owner only) ───────────────────────────────────────

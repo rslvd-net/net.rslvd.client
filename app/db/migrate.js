@@ -294,6 +294,16 @@ CREATE TABLE IF NOT EXISTS beta_testers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Operator-tunable settings (integers only; booleans are 0/1). Anything that is
+-- free text, a credential or an infrastructure value stays in the environment.
+-- No row means "use the default", so this table may start out empty.
+CREATE TABLE IF NOT EXISTS app_settings (
+  key VARCHAR(64) PRIMARY KEY,
+  value INTEGER NOT NULL,
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Remote access (premium SSH/ADB raw-port tunnels) + DNS2TCP retirement
 ALTER TABLE tunnels ALTER COLUMN tunnel_port DROP NOT NULL;
 ALTER TABLE tunnels ALTER COLUMN protocol TYPE VARCHAR(16);

@@ -6,11 +6,16 @@
  * cannot spread its guesses over many addresses. server.js trusts exactly one
  * proxy hop, so req.ip is the real client rather than 127.0.0.1.
  *
+ * Limits and windows come from lib/settings.js, so the site owner can tune them
+ * from the admin panel; each limiter reads its budget on every request, so a
+ * change applies immediately.
+ *
  * The store is the in-process default. The app runs as a single systemd service,
  * so per-process counters are the whole picture; if it is ever scaled out this
  * needs a shared store (Redis is already a dependency).
  */
 const rateLimit = require('express-rate-limit');
+const settings = require('../lib/settings');
 
 const { ipKeyGenerator } = rateLimit;
 
@@ -42,7 +47,7 @@ function limiter({ windowMs, limit, keyGenerator, message, skipSuccessfulRequest
 // get a budget. Successful sign-ins are refunded so normal use never runs out.
 const loginByIp = limiter({
   windowMs: 15 * MINUTE,
-  limit: 20,
+  limit: () => settings.get('rl_login_ip'),
   keyGenerator: byIp,
   skipSuccessfulRequests: true,
   message: 'Too many sign-in attempts from this address. Wait a few minutes and try again.',
@@ -50,7 +55,7 @@ const loginByIp = limiter({
 
 const loginByEmail = limiter({
   windowMs: 15 * MINUTE,
-  limit: 10,
+  limit: () => settings.get('rl_login_email'),
   keyGenerator: byEmail,
   skipSuccessfulRequests: true,
   message: 'Too many sign-in attempts for this account. Wait a few minutes and try again.',
@@ -59,7 +64,7 @@ const loginByEmail = limiter({
 // Sign-up sends a verification mail and hashes a password: keep it slow.
 const registerByIp = limiter({
   windowMs: HOUR,
-  limit: 5,
+  limit: () => settings.get('rl_register_ip'),
   keyGenerator: byIp,
   message: 'Too many sign-up attempts. Try again later.',
 });
@@ -67,14 +72,14 @@ const registerByIp = limiter({
 // Calm, even respond 200 to unknown emails, but each hit can send mail.
 const forgotByIp = limiter({
   windowMs: HOUR,
-  limit: 10,
+  limit: () => settings.get('rl_forgot_ip'),
   keyGenerator: byIp,
   message: 'Too many reset requests from this address. Try again later.',
 });
 
 const forgotByEmail = limiter({
   windowMs: HOUR,
-  limit: 3,
+  limit: () => settings.get('rl_forgot_email'),
   keyGenerator: byEmail,
   message: 'Too many reset emails for this account. Try again later.',
 });
@@ -82,7 +87,7 @@ const forgotByEmail = limiter({
 // Token guessing is infeasible, but each attempt runs bcrypt.
 const resetByIp = limiter({
   windowMs: 15 * MINUTE,
-  limit: 10,
+  limit: () => settings.get('rl_reset_ip'),
   keyGenerator: byIp,
   message: 'Too many password resets from this address. Wait a few minutes and try again.',
 });
@@ -90,14 +95,14 @@ const resetByIp = limiter({
 // Signed-in actions that check a password or a 6-digit code.
 const accountAction = limiter({
   windowMs: 15 * MINUTE,
-  limit: 10,
+  limit: () => settings.get('rl_account_action'),
   keyGenerator: byUser,
   message: 'Too many attempts on this account. Wait a few minutes and try again.',
 });
 
 const resendVerificationByUser = limiter({
   windowMs: HOUR,
-  limit: 3,
+  limit: () => settings.get('rl_resend_verify'),
   keyGenerator: byUser,
   message: 'Too many verification emails. Try again later.',
 });
