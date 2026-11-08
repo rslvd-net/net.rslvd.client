@@ -1,6 +1,6 @@
 // rslvd.privatedns.org Service Worker — offline shell + DDNS background sync
 
-const CACHE_NAME = 'rslvd-v4';
+const CACHE_NAME = 'rslvd-v5';
 const SHELL_ASSETS = [
   '/',
   '/app2.js',
