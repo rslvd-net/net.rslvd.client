@@ -68,7 +68,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, async () => {
-  console.log(`rslvd.privatedns.org DDNS server running on port ${PORT}`);
+  console.log(`rslvd.net DDNS server running on port ${PORT}`);
   await require('./db/migrate').run();
   try {
     await require('./lib/settings').load();

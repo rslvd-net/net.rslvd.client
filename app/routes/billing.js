@@ -87,7 +87,7 @@ router.post('/donate', requireAuth, requireGateway, async (req, res) => {
       userId: user.id, plan: 'donation', kind: 'donation', amountCents: cents,
       customerId, cardId: card.id,
     });
-    const payment = await payments.executeIntent(intent, 'rslvd.privatedns.org donation');
+    const payment = await payments.executeIntent(intent, 'rslvd.net donation');
     const bonus = await payments.applyDonation(intent, payment);
 
     activity.log('user.donation', { userId: user.id, detail: `$${(cents / 100).toFixed(2)}`, req });

@@ -21,23 +21,23 @@ function systemPrompt() {
   const donorTerm = DONATION.donorDays % 30 === 0
     ? `${DONATION.donorDays / 30} month${DONATION.donorDays === 30 ? '' : 's'}`
     : `${DONATION.donorDays} days`;
-  return `You are the support assistant for rslvd.privatedns.org, a Dynamic DNS (DDNS) and tunneling service.
+  return `You are the support assistant for rslvd.net, a Dynamic DNS (DDNS) and tunneling service.
 
-Facts about rslvd.privatedns.org:
-- Users get permanent subdomains like yourname.rslvd.privatedns.org that point at their home IP (DDNS), and reverse tunnels that expose local services even behind CGNAT (no port forwarding needed).
-- Free accounts: ${free.maxHosts} hostnames, ${free.maxTunnels} tunnels, plus ${free.remote.ssh} SSH and ${free.remote.adb} ADB tunnel (counted separately, so ${free.maxHosts + free.maxTunnels + freeRemote} tunnels total), no nesting. Donor access (donation only, no subscriptions): unlimited hostnames and tunnels, unlimited SSH/ADB tunnels, and nested subdomains like api.yourname.rslvd.privatedns.org.
+Facts about rslvd.net:
+- Users get permanent subdomains like yourname.rslvd.net that point at their home IP (DDNS), and reverse tunnels that expose local services even behind CGNAT (no port forwarding needed).
+- Free accounts: ${free.maxHosts} hostnames, ${free.maxTunnels} tunnels, plus ${free.remote.ssh} SSH and ${free.remote.adb} ADB tunnel (counted separately, so ${free.maxHosts + free.maxTunnels + freeRemote} tunnels total), no nesting. Donor access (donation only, no subscriptions): unlimited hostnames and tunnels, unlimited SSH/ADB tunnels, and nested subdomains like api.yourname.rslvd.net.
 - Donations: any donation (minimum ${settings.money(DONATION.minCents)}) grants ${donorTerm} of donor access. Donating again extends the window. The monthly goal is ${settings.money(DONATION.goalCents)}.
-- DDNS updates use the standard DynDNS protocol: GET https://rslvd.privatedns.org/api/update?key=UPDATE_KEY&ip=1.2.3.4 (responses: good, nochg, badauth). Works with ddclient, routers (DD-WRT/OpenWrt), and the rslvd apps.
+- DDNS updates use the standard DynDNS protocol: GET https://rslvd.net/api/update?key=UPDATE_KEY&ip=1.2.3.4 (responses: good, nochg, badauth). Works with ddclient, routers (DD-WRT/OpenWrt), and the rslvd apps.
 - Each hostname has an Update Key (shown on the host card, can be regenerated). Each tunnel has a connect token.
-- Tunnels: run "rslvd-tunnel TOKEN LOCAL_PORT" (download at rslvd.privatedns.org/downloads), or use the Android app's built-in tunnel client. Protocols: TCP (default), UDP (-udp), plus remote access: SSH (-ssh TOKEN 22) and ADB (-adb TOKEN 5555), which publish a real public TCP port (20000-29999) on the server so you connect with "ssh -p PORT user@yourname.rslvd.net" or "adb connect yourname.rslvd.net:PORT". Free accounts include one SSH and one ADB tunnel; donors get unlimited.
+- Tunnels: run "rslvd-tunnel TOKEN LOCAL_PORT" (download at rslvd.net/downloads), or use the Android app's built-in tunnel client. Protocols: TCP (default), UDP (-udp), plus remote access: SSH (-ssh TOKEN 22) and ADB (-adb TOKEN 5555), which publish a real public TCP port (20000-29999) on the server so you connect with "ssh -p PORT user@yourname.rslvd.net" or "adb connect yourname.rslvd.net:PORT". Free accounts include one SSH and one ADB tunnel; donors get unlimited.
 - HTTP tunnels/hosts get free automatic Let's Encrypt HTTPS certificates. HTTPS can be toggled per host/tunnel.
-- Apps: Android app (Play Store / rslvd.privatedns.org/downloads) with DDNS auto-update, tunnel client, and a shell tab. There is also a web dashboard at rslvd.privatedns.org/dashboard.
+- Apps: Android app (Play Store / rslvd.net/downloads) with DDNS auto-update, tunnel client, and a shell tab. There is also a web dashboard at rslvd.net/dashboard.
 - Login supports optional 2FA (TOTP). If 2FA codes are rejected, the user's device clock is usually wrong - set Date & Time to automatic.
 - Payments are processed by Square. Donations are one-time; there are no subscriptions to cancel.
 
 Rules:
 - Be concise, friendly, and practical. Give step-by-step instructions when helpful.
-- Only answer questions about rslvd.privatedns.org. For anything else, politely say it's out of scope.
+- Only answer questions about rslvd.net. For anything else, politely say it's out of scope.
 - Never invent features, prices, or promises. Never ask for passwords, update keys, tokens, or payment details.
 - If you are not confident you can solve the problem (billing disputes, refunds, account recovery, deleting data, bugs, outages), say so and tell the user to press the "Escalate to a human" button so the site owner can help.
 - Always end with a short note that they can press "Escalate to a human" if your answer didn't solve it.`;
@@ -86,7 +86,7 @@ async function escalate(ticketId, reason) {
   const { rows: [u] } = await pool.query('SELECT email FROM users WHERE id = $1', [ticket.user_id]);
   notifyAdmin(
     `Support ticket #${ticket.id} needs you: ${ticket.subject}`,
-    `From ${u ? u.email : 'unknown user'} — ${reason}\n\nReply at https://rslvd.privatedns.org/support`
+    `From ${u ? u.email : 'unknown user'} — ${reason}\n\nReply at https://rslvd.net/support`
   ).catch((e) => console.error('[support-ai] escalation notify failed:', e.message));
   return ticket;
 }

@@ -1,1193 +1,296 @@
-# **Running a home lab behind CGNAT?**
- 
-###### If you've ever tried to access a service running at home from outside your network, you know how frustrating networking limitations can be.
- 
-###### I'm working on **RSLVD.net**, a project focused on Dynamic DNS and CGNAT tunneling.
- 
-*** I'm looking to connect with home-lab enthusiasts, self-hosters, and developers who want to make their services reachable.
- 
-I'd love to hear:
- 
-- What are you running at home?
-- What is your biggest remote-access challenge?
-- What would make a tool like this genuinely useful to you?
+# rslvd.net
 
-Check it out: https://rslvd.privatedns.org/
+**Dynamic DNS and CGNAT tunneling — reachable from anywhere.**
 
-# RSLVD.NET
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Licence: AGPL-3.0](https://img.shields.io/badge/Licence-AGPL--3.0-blue.svg)](LICENCE.md)
 [![Node.js](https://img.shields.io/badge/Node.js-22+-green.svg)](https://nodejs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17+-blue.svg)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791.svg)](https://www.postgresql.org/)
+[![Android](https://img.shields.io/badge/Android-3.7-3DDC84.svg)](rslvd-android/)
 
-> Dynamic DNS & CGNAT Tunnel SaaS - Free subdomains, automatic IP updates, and TCP tunnels that punch through carrier-grade NAT.
+**Live service:** <https://rslvd.net> · **Status, terms and downloads:** <https://rslvd.net>
 
-**Live:** https://rslvd.privatedns.org
-
----
-
-## Table of Contents
-
-- [Features](#features)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Deployment](#deployment)
-- [Building Tunnel Client](#building-tunnel-client)
-- [API Reference](#api-reference)
-- [Development](#development)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
+rslvd.net gives you a permanent hostname and a working TCP tunnel from a network you do not
+control — a home lab behind CGNAT, a lab machine at work, a phone on mobile data. The service is
+donation-funded: every donation buys 90 days of donor access, and there are no subscriptions.
 
 ---
 
 ## Features
 
-- **🌐 Dynamic DNS** - Automatic IP updates via HTTP API, compatible with any DynDNS client
-- **🚇 CGNAT Tunnels** - TCP tunnels that work behind carrier-grade NAT without port forwarding
-- **🛰️ Remote Access (premium)** - SSH and ADB tunnels that publish a real TCP port (20000-29999) on the server, so `ssh -p PORT user@name.rslvd.net` and `ssh -p PORT user@name.rslvd.net` / `adb connect name.rslvd.net:PORT` work from anywhere. Requires any paid plan
-- **📡 UDP Tunnels** - DNS, VoIP, and game servers
-- **🔒 Free SSL Certificates** - Automatic Let's Encrypt integration
-- **💳 Subscription Billing** - Square integration with multiple pricing tiers
-- **📱 Multi-Platform** - Tunnel client binaries for Linux, macOS, Windows, Android (Termux), and routers
-- **🛡️ Admin Dashboard** - Built-in user management and activity logging
-- **⚡ WebSocket Support** - Full WebSocket and binary protocol support through tunnels
+- **Dynamic DNS** — permanent `<name>.rslvd.net` subdomains, updated by any DynDNS-style client.
+- **HTTP(S) tunnels** — expose a local web service through the tunnel proxy, WebSockets included.
+- **Raw TCP/UDP tunnels** — arbitrary protocols, not just HTTP.
+- **SSH and ADB remote access** (donor) — a real public port (`20000-29999`) wired straight through,
+  so `ssh -p 21234 you@lab.rslvd.net` and `adb connect phone.rslvd.net:21235` just work.
+- **Nested subdomains** (donor) — `api.ownerbase.rslvd.net`, with per-host certificates.
+- **Automatic TLS** — Let's Encrypt wildcard via DNS-01, plus per-tunnel certificates.
+- **Web dashboard and PWA** — hosts, tunnels, DDNS auto-updater, donation status, admin tools.
+- **Android client** — Kotlin/Compose app for on-device tunnels and DDNS (see `rslvd-android/`).
+- **Donations, not subscriptions** — Square payments, one-off, no recurring charge to cancel.
+
+Free accounts get 2 hostnames and 2 tunnels. Any donation raises the account to donor access for 90
+days: unlimited hostnames and tunnels, SSH/ADB remote access, nested subdomains. Donations start at
+$1.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
-│   Router    │────▶│  rslvd.app  │────▶│  IONOS DNS API  │
-│  (DDNS)     │     │   (Node.js) │     │                 │
-└─────────────┘     └─────────────┘     └─────────────────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │  PostgreSQL │
-                    │    Redis    │
-                    └─────────────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │ Tunnel Proxy│◀────┐
-                    │  (ports     │     │
-                    │  7000/7001) │     │
-                    └─────────────┘     │
-                                        │
-                              ┌─────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │ rslvd-tunnel CLI│
-                    │  (user's device)│
-                    └─────────────────┘
+                    ┌──────────────────────────── rslvd.net server ────────────────────────────┐
+  browser ──443──▶  │ nginx ──▶ Node/Express (3001)  ──▶ PostgreSQL                            │
+                    │   │            │  auth, hosts, tunnels, billing, admin, support           │
+                    │   │            └──▶ tunnel proxy  (control 7000/7001, HTTP 8080, UDP 7100) │
+  *.rslvd.net ─443─▶│   └──▶ tunnel proxy ──▶ per-tunnel TCP port (20000-29999) ──▶ your device  │
+                    │ certbot + IONOS DNS API (DNS-01)      systemd: rslvd                      │
+                    └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Components:**
-- **Node.js API** - Express server handling auth, DNS updates, billing, admin
-- **PostgreSQL** - User accounts, hosts, tunnels, subscriptions
-- **Redis** - Session caching (optional)
-- **Tunnel Proxy** - Built-in TCP tunnel server (ports 7000/7001)
-- **Tunnel Client** - Go binary for establishing reverse tunnels
-- **Nginx** - Reverse proxy and SSL termination
-- **Certbot** - Automatic SSL certificate management
+| Component | Role |
+|---|---|
+| `app/server.js` | Express 5 API, serves the SPA, runs migrations, starts the tunnel proxy |
+| `app/lib/tunnel-proxy.js` | tunnel broker: control/data channels, HTTP proxy, raw public ports |
+| `app/public/app2.js` | the whole dashboard SPA — plain `React.createElement`, no build step |
+| `tunnel-client/` | Go client, cross-compiled into `app/public/dl/` |
+| `rslvd-android/` | Android client |
+| nginx | TLS termination, wildcard vhosts, per-FQDN HTTP fallback |
+| certbot + `certbot-hooks/` | wildcard and per-tunnel certificates via IONOS DNS-01 |
 
 ---
 
-## Prerequisites
+## Requirements
 
-### Server Requirements
+| | |
+|---|---|
+| OS | Debian/Ubuntu (systemd, nginx, certbot) |
+| Node.js | 22 or newer |
+| PostgreSQL | 15 or newer |
+| nginx | any current packaged version |
+| Go | 1.21+ — only to build the tunnel client |
+| Android build | SDK 36, JDK 17 — only for the app |
+| Accounts | IONOS DNS API key (DNS + certificates), Square (donations, optional), SMTP (email, optional) |
 
-- **OS:** Debian 12+ / Ubuntu 22.04+ (recommended)
-- **RAM:** 1GB minimum, 2GB recommended
-- **CPU:** 1 core minimum
-- **Disk:** 10GB minimum
-- **Network:** Public IP, ports 80, 443, 7000, 7001 open
-
-### Software Dependencies
-
-```bash
-# System packages
-sudo apt update
-sudo apt install -y nodejs npm postgresql redis-server nginx git curl
-
-# Go (for building tunnel client)
-sudo apt install -y golang-go
-
-# Certbot
-sudo apt install -y certbot python3-certbot-nginx
-```
-
-### External Services
-
-| Service | Purpose | Setup Required |
-|---------|---------|----------------|
-| IONOS DNS | DNS record management | [Get API Key](https://developer.hosting.ionos.com/) |
-| Square | Payment processing | [Square Developer Dashboard](https://developer.squareup.com/apps) |
-| Domain | Your domain name | Configure nameservers to IONOS |
+Ports: `80`, `443`, `7000-7001/tcp` (tunnel control), `7100-7101/udp`, `20000-29999/tcp` (raw
+tunnels). `8080` is the local HTTP tunnel proxy and should stay bound to localhost.
 
 ---
 
-## Quick Start
+## Quick start
+
+One guided script does everything the old `deploy.sh`, `setup-owner.sh`, `add-nginx-map.sh` and
+`build-tunnel.sh` did — user, database, `.env`, nginx, certificates, systemd, owner account, and
+optionally the client binaries. It is idempotent, so it doubles as the upgrade path.
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/igaret/rslvd.privatedns.org.git
-cd rslvd.privatedns.org
+git clone https://github.com/igaret/rslvd.net.git
+cd rslvd.net
 
-# 2. Copy and configure environment
-cp app/.env.example app/.env
-# Edit app/.env with your credentials
-
-# 3. Run deployment script
-./deploy.sh
+sudo ./setup.sh                      # prompts for domain, email, IONOS key, owner account
+sudo ./setup.sh --dry-run            # show every action without changing anything
+sudo ./setup.sh --help               # all flags
 ```
 
----
-
-## Installation
-
-### Step 1: Server Setup
+Useful invocations:
 
 ```bash
-# Create app user
-sudo useradd -r -s /bin/false rslvd
-
-# Create directories
-sudo mkdir -p /opt/rslvd/public/dl
-sudo chown -R rslvd:rslvd /opt/rslvd
-
-# Install Node.js 22
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
+sudo ./setup.sh --upgrade                       # push the current tree and restart
+sudo ./setup.sh --build-client                  # cross-compile the Go client into public/dl
+sudo ./setup.sh --no-ssl --no-nginx             # app + database + systemd only
+./setup.sh --dev                                # local development, no root, no nginx
 ```
 
-### Step 2: Database Setup
+Before running it, point DNS at the server — an `A` record for the domain, and the IONOS zone must
+exist. With an IONOS key the script issues a `*.domain` wildcard certificate via DNS-01; without one
+it falls back to HTTP-01 for the bare domain (nested tunnel certificates then need the key).
 
-```bash
-# Switch to postgres user
-sudo -u postgres psql
+What it writes:
 
-# Create database and user
-CREATE USER rslvd WITH PASSWORD 'your_secure_password';
-CREATE DATABASE rslvd OWNER rslvd;
-\q
+| Path | Contents |
+|---|---|
+| `/opt/rslvd` | application (`--app-dir` to change), `owner-credentials.txt` |
+| `/opt/rslvd/.env` | generated configuration, mode `600` |
+| `/etc/nginx/sites-available/<domain>` | generated vhost (map, main site, wildcard, nested HTTP) |
+| `/etc/systemd/system/rslvd.service` | the service unit |
+| `/etc/sudoers.d/rslvd-ssl` | NOPASSWD for the per-tunnel certificate scripts |
+| `/etc/letsencrypt/renewal-hooks/deploy/` | nginx reload after renewal |
 
-# Set environment variable in ~/.bashrc or service file
-export DATABASE_URL="postgresql://rslvd:your_secure_password@localhost:5432/rslvd"
-```
-
-### Step 3: Application Deployment
-
-```bash
-# Copy application files
-sudo cp -r app/* /opt/rslvd/
-sudo chown -R rslvd:rslvd /opt/rslvd
-
-# Install dependencies
-cd /opt/rslvd
-sudo -u rslvd npm install --production
-
-# Run database migrations
-sudo -u rslvd node -e "require('./db/migrate').run()"
-```
-
-### Step 4: Nginx Configuration
-
-```bash
-# Copy nginx config
-sudo cp app/nginx.conf /etc/nginx/sites-available/example.com
-sudo ln -sf /etc/nginx/sites-available/example.com /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
-
-# Test and reload
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### Step 5: SSL Certificate
-
-```bash
-# Obtain certificate
-sudo certbot --nginx -d example.com -d www.example.com \
-  --email admin@example.com --agree-tos --non-interactive
-
-# Auto-renewal is set up automatically
-```
-
-### Step 6: Systemd Service
-
-```bash
-# Copy service file
-sudo cp app/rslvd.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable rslvd
-sudo systemctl start rslvd
-
-# Check status
-sudo systemctl status rslvd
-```
+`setup.sh` regenerates the vhost, unit and `.env` on every run. Do not hand-edit them — edit the
+script, or keep local overrides in a separate nginx file.
 
 ---
 
 ## Configuration
 
-### Environment Variables
+`/opt/rslvd/.env` (generated, mode `600`). Re-run `sudo ./setup.sh --upgrade` after changing values
+the script owns.
 
-Create `app/.env`:
+| Variable | Purpose |
+|---|---|
+| `PORT` | port the Node app listens on (default `3001`) |
+| `APP_URL` | public base URL, e.g. `https://rslvd.net` |
+| `BASE_DOMAIN` | the zone subdomains are issued in |
+| `SERVER_IP` | public address advertised in the UI/docs |
+| `DATABASE_URL` | `postgres://user:pass@127.0.0.1:5432/rslvd` |
+| `JWT_SECRET` | signs session tokens; rotating it logs everyone out |
+| `ADMIN_EMAIL` | recipient of admin notifications |
+| `IONOS_API_KEY` | DNS records and DNS-01 certificates |
+| `SQUARE_ACCESS_TOKEN`, `SQUARE_APPLICATION_ID`, `SQUARE_LOCATION_ID` | donations |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | donation webhook verification |
+| `SQUARE_ENVIRONMENT` | `sandbox` or `production` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | verification, reset and support mail |
+| `NTFY_*`, `TWILIO_*`, `ADMIN_PHONE` | optional admin alerting |
+| `SUPPORT_AI`, `OLLAMA_URL`, `SUPPORT_AI_MODEL` | optional support assistant |
 
-```env
-NODE_ENV=production
-PORT=3001
-
-# Database
-DATABASE_URL=postgresql://rslvd:password@localhost:5432/rslvd
-
-# Redis (optional)
-REDIS_URL=redis://localhost:6379
-
-# JWT Secret (generate random string)
-JWT_SECRET=your_random_jwt_secret_here
-
-# IONOS DNS API
-IONOS_API_KEY=your_ionos_api_key_here
-
-# Square
-SQUARE_ACCESS_TOKEN=EAAA...
-SQUARE_APPLICATION_ID=sq0idp-...
-SQUARE_LOCATION_ID=L...
-SQUARE_ENVIRONMENT=production
-SQUARE_WEBHOOK_SIGNATURE_KEY=...
-
-# Domain
-BASE_DOMAIN=example.com
-APP_URL=https://example.com
-SERVER_IP=your_server_ip
-```
-
-### Runtime settings
-
-The site owner gets a **Settings** tab in the admin panel (`/admin` → ⚙️ Settings).
-It edits whole numbers only and applies them on the next request — no restart,
-no deploy. Stored in the `app_settings` table; a missing row means "use the
-default" from `app/lib/settings.js`.
-
-| Group | Settings |
-|-------|----------|
-| Donations | monthly goal (cents), minimum and maximum donation (cents), donor days per donation |
-| Free plan | free hostnames, free general tunnels, free SSH tunnels, free ADB tunnels |
-| Rate limits | sign-in attempts per address and per account, sign-ups, password-reset requests and submissions, 2FA/password checks, verification emails |
-| Support & beta | AI support replies (1/0), Android beta tester slots |
-
-Deliberately **not** editable in the panel: anything that is free text —
-credentials, API keys, `BASE_DOMAIN`, `APP_URL`, `SERVER_IP`, SMTP settings.
-Those stay in `/opt/rslvd/.env` so a web session can never rewrite them.
-`SUPPORT_AI=false` in the environment still overrides the panel switch.
-
-```bash
-# Read everything (deployment block + settings with min/max/default)
-curl -H "Authorization: Bearer $TOKEN" https://example.com/api/admin/config
-
-# Change one value (integers only; out-of-range or non-numeric answers 400)
-curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"settings":{"donation_goal_cents":3000,"free_adb_tunnels":0}}' \
-  https://example.com/api/admin/config
-```
-
-### Site Admin Account
-
-```bash
-# Run setup script
-./setup-admin.sh
-
-# Or manually create admin user in database
-sudo -u rslvd psql rslvd -c "
-INSERT INTO users (email, password_hash, role, is_admin, is_site_owner, plan, subscription_status, max_hosts, max_tunnels)
-VALUES ('admin@example.com', '\$2a\$10\$...', 'site_owner', true, true, 'annual', 'active', 999, 999);
-"
-```
+Limits live in code, not in the database: `app/lib/plans.js` holds the free tier (2 hosts, 2
+tunnels), the donation term (90 days), and the donor-only protocols (`ssh`, `adb`) and nesting.
 
 ---
 
-## Deployment
-
-### Automated Deployment
-
-The `deploy.sh` script handles full deployment:
+## Operations
 
 ```bash
-# On local machine
-scp -r app/ user@server:/tmp/rslvd-app
-ssh user@server 'cd /tmp/rslvd-app && sudo ./deploy.sh'
+sudo systemctl status rslvd           # is it up
+sudo journalctl -u rslvd -f           # application log (includes tunnel proxy)
+sudo tail -f /var/log/nginx/error.log # proxy log
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-### Manual Deployment Steps
-
-1. **Upload files** to `/tmp/rslvd-app/`
-2. **Run deploy script** which:
-   - Creates `rslvd` user
-   - Copies application files to `/opt/rslvd/`
-   - Installs npm dependencies
-   - Sets up systemd service
-   - Configures nginx
-   - Requests SSL certificate
-   - Starts services
-
-### Updating the Application
+Upgrading:
 
 ```bash
-# Quick update (frontend only)
-scp app/public/app2.js rslvd@server:/opt/rslvd/public/
-ssh rslvd@server 'sudo systemctl restart rslvd'
-
-# Full update
-./deploy.sh
+git pull
+sudo ./setup.sh --upgrade             # copies code, reinstalls deps, migrates, restarts
 ```
+
+`.env`, the database and `public/dl` are preserved. Schema changes are applied on start by
+`app/db/migrate.js`; every statement is `IF NOT EXISTS`/`ADD COLUMN`, so old databases upgrade in
+place.
+
+Backups: `scripts/full-backup.sh` dumps the database and code; restoration is covered in
+`scripts/RESTORE.md`. Certificates renew through the packaged certbot timer — verify with
+`sudo certbot renew --dry-run`.
+
+Firewall (if you enable ufw): `sudo ./setup.sh --firewall` opens `80`, `443`, `7000-7001/tcp`,
+`7100-7101/udp` and `20000-29999/tcp`. It deliberately does not touch SSH.
 
 ---
 
-## Building Tunnel Client
+## Forking and rebranding
 
-The tunnel client is a Go binary that establishes reverse TCP tunnels.
-
-### Build All Platforms
-
-```bash
-# Run build script
-sudo ./build-tunnel.sh
-
-# Or build manually
-cd tunnel-client
-
-go build -ldflags="-s -w" -o rslvd-tunnel-linux-amd64 .
-GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o rslvd-tunnel-darwin-arm64 .
-# ... etc for other platforms
-```
-
-### Supported Platforms
-
-| Platform | Binary Name |
-|----------|-------------|
-| Linux AMD64 | `rslvd-tunnel-linux-amd64` |
-| Linux ARM64 | `rslvd-tunnel-linux-arm64` |
-| Linux ARM | `rslvd-tunnel-linux-arm` |
-| Linux MIPS | `rslvd-tunnel-linux-mips` |
-| Linux MIPSLE | `rslvd-tunnel-linux-mipsle` |
-| Linux MIPS64 | `rslvd-tunnel-linux-mips64` |
-| macOS Intel | `rslvd-tunnel-darwin-amd64` |
-| macOS Apple Silicon | `rslvd-tunnel-darwin-arm64` |
-| Windows | `rslvd-tunnel-windows-amd64.exe` |
-
-### Installation Script
-
-Create `/opt/rslvd/public/install.sh`:
+The code is AGPL-3.0: run it, change it, host it for others. The **name and domain are reserved**, so
+rebrand before you publish.
 
 ```bash
-#!/bin/bash
-# Auto-detect platform and install
-# (See repository for full install script)
+./fork.sh example.com          # rewrite every rslvd.net reference in the tree
+./fork.sh example.com --dry-run
+./fork.sh --check              # list anything still pointing at rslvd.net
 ```
+
+`fork.sh` rewrites the plain domain, the escaped form used in nginx/`grep -E` patterns
+(`rslvd\.net`) and the uppercase form, in every tracked text file, and leaves `LICENCE.md` and binary
+assets alone. Then:
+
+1. Replace the logo and icons (`app/public/img`, `app/public/icons`, `rslvd-android/.../res`).
+2. Edit the marketing copy in `index.html`, `app2.js` and the SEO landing pages.
+3. Change the Android `applicationId`, app name and package folders if you ship an app.
+4. Rename the service user, `/opt/rslvd`, `rslvd.service` and the Go binary names if you want a clean
+   break — `setup.sh --service` and `--app-dir` cover the installed side.
+5. Keep the AGPL notices and the original copyright line in `LICENCE.md`.
+
+A fork is responsible for its own users, certificates, DNS zone, payments and legal pages.
 
 ---
 
-## API Reference
+## API
 
-### Authentication
+All endpoints are under `/api`. Authenticated calls use `Authorization: Bearer <jwt>`.
+
+| Area | Endpoints |
+|---|---|
+| Auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `PATCH /auth/profile`, `POST /auth/change-password`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `GET /auth/verify-email`, `POST /auth/2fa/setup|verify|disable`, `GET /auth/activity`, `POST /auth/accept-legal` |
+| Hosts | `GET/POST /hosts`, `PATCH /hosts/:id`, `PATCH /hosts/:id/https`, `POST /hosts/:id/regenerate-key`, `DELETE /hosts/:id` |
+| DDNS update | `GET|POST /update?key=<update_key>&ip=<addr>` (DynDNS compatible), `GET /ip` |
+| Tunnels | `GET/POST /tunnels`, `GET /tunnels/:id`, `PATCH /tunnels/:id`, `PATCH /tunnels/:id/https`, `POST /tunnels/:id/regenerate-token`, `GET /tunnels/remote-access`, `DELETE /tunnels/:id` |
+| Client | `GET /tunnels/connect/:token` — control-channel handshake used by the Go client |
+| Billing | `GET /billing/goal`, `GET /billing/config`, `POST /billing/donate`, `POST /billing/update-payment`, `POST /webhook` (Square) |
+| Account | `POST /account/delete` (password-confirmed, tears down hosts and tunnels) |
+| Support | `GET/POST /support`, `GET /support/:id`, `POST /support/:id/reply|escalate` |
+| Admin | `GET /admin/stats|users|hosts|tunnels|activity|config`, `PATCH /admin/users/:id`, `DELETE /admin/users/:id`, reserved-subdomain management, `GET /admin/backup` |
+| Misc | `POST /track/pageview`, `GET /beta/status`, `POST /beta/signup`, `GET /dns-changes`, `GET /dns-changes/export` |
+
+Tunnel protocols: `tcp`, `udp`, `ssh`, `adb`. `ssh` and `adb` create a raw public port
+(`tunnel_port`, `20000-29999`); the other two are proxied through the tunnel broker.
+
+---
+
+## Tunnel client
 
 ```bash
-# Login
-POST /api/auth/login
-{ "email": "user@example.com", "password": "secret" }
-
-# Response: { "token": "jwt_token_here" }
-# Include token in header: Authorization: Bearer <token>
+sudo ./setup.sh --build-client        # builds every target into app/public/dl
 ```
 
-### Hosts (Dynamic DNS)
+Targets: `linux-amd64`, `linux-arm64`, `linux-arm` (armv7), `linux-mips`, `linux-mipsle`,
+`darwin-amd64`, `darwin-arm64`, `windows-amd64`. Binaries are served from `/dl/`; the router and
+Termux installers are `app/public/install.sh`, `install-openwrt.sh` and `install-ddwrt.sh`.
+
+Typical use:
 
 ```bash
-# List hosts
-GET /api/hosts
-
-# Create host
-POST /api/hosts
-{ "fqdn": "myhost.example.com" }
-
-# Update IP (DynDNS compatible)
-GET /api/update?key=<update_key>&ip=1.2.3.4
-
-# Regenerate key
-POST /api/hosts/:id/regenerate-key
-```
-
-### Tunnels
-
-```bash
-# List tunnels (remote-access rows include is_remote, remote_host, remote_port)
-GET /api/tunnels
-
-# Create tunnel — protocol: tcp | udp | ssh | adb
-POST /api/tunnels
-{ "name": "mytunnel", "target_port": 8080 }
-{ "name": "myserver", "target_port": 22, "protocol": "ssh" }   # premium
-{ "name": "myphone",  "target_port": 5555, "protocol": "adb" } # premium
-
-# Remote-access availability for the current plan
-GET /api/tunnels/remote-access
-
-# Delete tunnel
-DELETE /api/tunnels/:id
-```
-
-**Remote access (premium).** `ssh` and `adb` tunnels get a real public port on the
-server (`tunnel_port`, 20000-29999) wired straight through to the client's local
-port — no HTTP, no TLS termination, so binary protocols work end to end:
-
-```bash
-rslvd-tunnel -ssh TOKEN 22      # exposes local SSH
-rslvd-tunnel -adb TOKEN 5555    # exposes a device's adbd (adb tcpip 5555)
-rslvd-tunnel -adb TOKEN 5037    # exposes a PC's adb server
-
-ssh -p <public_port> user@<tunnel-subdomain>   # e.g. user@myserver.rslvd.net
-adb connect <tunnel-subdomain>:<public_port>   # e.g. adb connect termux-adb.rslvd.net:20002
-```
-
-Any active paid plan or a site-owner/admin account unlocks remote access; free plans
-see a locked preview with an upgrade CTA. The proxy enforces the plan at handshake
-time as well as in the API.
-
-### Billing
-
-```bash
-# Get plans
-GET /api/billing/plans
-
-# Checkout
-POST /api/billing/checkout
-{ "plan": "annual" }
-
-# Customer portal
-POST /api/billing/portal
-
-# Cancel subscription
-POST /api/billing/cancel
-```
-
-### Admin (Site Owner Only)
-
-```bash
-GET /api/admin/stats
-GET /api/admin/users
-GET /api/admin/hosts
-GET /api/admin/tunnels
-GET /api/admin/activity
-PATCH /api/admin/users/:id
-DELETE /api/admin/users/:id
-GET /api/admin/config      # deployment info + tunable settings
-PATCH /api/admin/config    # { "settings": { "donation_goal_cents": 3000 } }
-GET /api/admin/logs        # last N service log lines this run (owner only)
+rslvd-tunnel -token <tunnel-token>            # HTTP tunnel
+rslvd-tunnel -token <token> -ssh              # raw SSH tunnel (donor)
+rslvd-tunnel -token <token> -adb              # raw ADB tunnel (donor)
 ```
 
 ---
 
 ## Development
 
-### Local Setup
-
 ```bash
-cd app
-npm install
-npm run dev
+./setup.sh --dev          # .env, dependencies, schema against a local database
+cd app && npm run dev     # http://localhost:3001
 ```
 
-### Database Migrations
+The dashboard has **no build step**: edit `app/public/app2.js`, disable the service worker in
+DevTools, reload. Bump the cache name in `app/public/sw.js` when you ship a change, or users keep the
+old file.
 
 ```bash
-# Run migrations
-node -e "require('./db/migrate').run()"
-
-# Migrations are in db/migrate.js
-# Auto-run on server start
-```
-
-### Frontend Development
-
-The frontend is a single-page React app in `app/public/app.js`:
-
-```javascript
-// Built with React.createElement (no build step required)
-// Edit app/public/app.js directly
-```
-
-### Testing Scripts
-
-```bash
-./test.sh              # Run all tests
-./test-account.sh      # Test user registration
-./test-block.sh        # Test subscription blocking
-./test-nested.sh       # Test nested subdomains
-./test-tcp-tunnel.sh   # Test tunnel functionality
-./verify-activity.sh   # Test activity logging
+node --check app/public/app2.js
+node --check app/routes/<file>.js
+bash -n setup.sh fork.sh scripts/*.sh
+cd rslvd-android && ./gradlew compileDebugKotlin
+cd tunnel-client && go vet ./... && go build ./...
 ```
 
 ---
 
-## Troubleshooting
+## Documentation
 
-### Common Issues
-
-**App won't start:**
-```bash
-# Check logs
-sudo journalctl -u rslvd -f
-
-# Verify database connection
-sudo -u rslvd psql $DATABASE_URL -c "SELECT 1"
-```
-
-**SSL certificate issues:**
-```bash
-# Renew manually
-sudo certbot renew --force-renewal
-
-# Check nginx config
-sudo nginx -t
-```
-
-**Tunnel connection fails:**
-```bash
-# Check ports are open
-sudo netstat -tlnp | grep -E '7000|7001'
-
-# Test DNS resolution
-nslookup example.com 8.8.8.8
-```
-
-**IONOS DNS errors:**
-```bash
-# Test IONOS API
-./certbot-hooks/test-ionos.sh
-```
-
-### Logs
-
-```bash
-# Application logs
-sudo journalctl -u rslvd -n 100 --no-pager
-
-# Nginx logs
-sudo tail -f /var/log/nginx/example.com-error.log
-
-# Tunnel proxy logs (in app logs)
-sudo journalctl -u rslvd | grep "TUNNEL"
-```
-
-### Firewall Configuration
-
-```bash
-# UFW
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw allow 7000/tcp
-sudo ufw allow 7001/tcp
-
-# iptables
-sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 7000 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 7001 -j ACCEPT
-```
+| File | Covers |
+|---|---|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | workflow, coding conventions, sign-off, review |
+| [SECURITY.md](SECURITY.md) | how to report a vulnerability, scope, safe harbour |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | expected behaviour and enforcement |
+| [LICENCE.md](LICENCE.md) | AGPL-3.0, trademark terms, contribution licensing |
+| [rslvd-android/README.md](rslvd-android/README.md), [BUILD.md](rslvd-android/BUILD.md), [PLAY_STORE.md](rslvd-android/PLAY_STORE.md) | Android app, build and store notes |
+| [scripts/RESTORE.md](scripts/RESTORE.md) | restoring from a backup |
+| [scripts/shell-repo/README.md](scripts/shell-repo/README.md) | apt repo for the shell installers |
 
 ---
 
-## Security Considerations
+## Community
 
-1. **Change default passwords** - Update all secrets in `.env`
-2. **Enable firewall** - Only expose necessary ports
-3. **Regular updates** - Keep Node.js, PostgreSQL, and system packages updated
-4. **Backup database** - Automated backups recommended
-5. **Monitor logs** - Watch for suspicious activity
-6. **Rate limiting** - Built-in on API endpoints
-7. **JWT expiration** - Tokens expire after 24 hours
+- **Bugs and features:** [GitHub Issues](https://github.com/igaret/rslvd.net/issues)
+- **Security:** security@rslvd.net — never a public issue
+- **Support:** support@rslvd.net
+- **Conduct:** conduct@rslvd.net
+- **Licensing and trademark:** legal@rslvd.net
 
 ---
 
-## License
-
-MIT License - See [LICENSE](LICENSE) file
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
----
-
-## Support
-
-- **Issues:** [GitHub Issues](https://github.com/igaret/rslvd.privatedns.org/issues)
-- **Email:** garet@rslvd.privatedns.org
-- **Documentation:** This README and inline code comments
-
----
-
-**Built with ❤️ by igaret** 
-                              ▼
-                    ┌─────────────────┐
-                    │ rslvd-tunnel CLI│
-                    │  (user's device)│
-                    └─────────────────┘
-```
-
-**Components:**
-- **Node.js API** - Express server handling auth, DNS updates, billing, admin
-- **PostgreSQL** - User accounts, hosts, tunnels, subscriptions
-- **Redis** - Session caching (optional)
-- **Tunnel Proxy** - Built-in TCP tunnel server (ports 7000/7001)
-- **Tunnel Client** - Go binary for establishing reverse tunnels
-- **Nginx** - Reverse proxy and SSL termination
-- **Certbot** - Automatic SSL certificate management
-
----
-
-## Prerequisites
-
-### Server Requirements
-
-- **OS:** Debian 12+ / Ubuntu 22.04+ (recommended)
-- **RAM:** 1GB minimum, 2GB recommended
-- **CPU:** 1 core minimum
-- **Disk:** 10GB minimum
-- **Network:** Public IP, ports 80, 443, 7000, 7001 open
-
-### Software Dependencies
-
-```bash
-# System packages
-sudo apt update
-sudo apt install -y nodejs npm postgresql redis-server nginx git curl
-
-# Go (for building tunnel client)
-sudo apt install -y golang-go
-
-# Certbot
-sudo apt install -y certbot python3-certbot-nginx
-```
-
-### External Services
-
-| Service | Purpose | Setup Required |
-|---------|---------|----------------|
-| IONOS DNS | DNS record management | [Get API Key](https://developer.hosting.ionos.com/) |
-| Square | Payment processing | [Square Developer Dashboard](https://developer.squareup.com/apps) |
-| Domain | Your domain name | Configure nameservers to IONOS |
-
----
-
-## Quick Start
-
-```bash
-# 1. Clone repository
-git clone https://github.com/yourusername/rslvd.privatedns.org.git
-cd rslvd.privatedns.org
-
-# 2. Copy and configure environment
-cp app/.env.example app/.env
-# Edit app/.env with your credentials
-
-# 3. Run deployment script
-./deploy.sh
-```
-
----
-
-## Installation
-
-### Step 1: Server Setup
-
-```bash
-# Create app user
-sudo useradd -r -s /bin/false rslvd
-
-# Create directories
-sudo mkdir -p /opt/rslvd/public/dl
-sudo chown -R rslvd:rslvd /opt/rslvd
-
-# Install Node.js 22
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-```
-
-### Step 2: Database Setup
-
-```bash
-# Switch to postgres user
-sudo -u postgres psql
-
-# Create database and user
-CREATE USER rslvd WITH PASSWORD 'your_secure_password';
-CREATE DATABASE rslvd OWNER rslvd;
-\q
-
-# Set environment variable in ~/.bashrc or service file
-export DATABASE_URL="postgresql://rslvd:your_secure_password@localhost:5432/rslvd"
-```
-
-### Step 3: Application Deployment
-
-```bash
-# Copy application files
-sudo cp -r app/* /opt/rslvd/
-sudo chown -R rslvd:rslvd /opt/rslvd
-
-# Install dependencies
-cd /opt/rslvd
-sudo -u rslvd npm install --production
-
-# Run database migrations
-sudo -u rslvd node -e "require('./db/migrate').run()"
-```
-
-### Step 4: Nginx Configuration
-
-```bash
-# Copy nginx config
-sudo cp app/nginx.conf /etc/nginx/sites-available/rslvd.privatedns.org
-sudo ln -sf /etc/nginx/sites-available/rslvd.privatedns.org /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
-
-# Test and reload
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### Step 5: SSL Certificate
-
-```bash
-# Obtain certificate
-sudo certbot --nginx -d rslvd.privatedns.org -d www.rslvd.privatedns.org \
-  --email admin@rslvd.privatedns.org --agree-tos --non-interactive
-
-# Auto-renewal is set up automatically
-```
-
-### Step 6: Systemd Service
-
-```bash
-# Copy service file
-sudo cp app/rslvd.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable rslvd
-sudo systemctl start rslvd
-
-# Check status
-sudo systemctl status rslvd
-```
-
----
-
-## Configuration
-
-### Environment Variables
-
-Create `app/.env`:
-
-```env
-NODE_ENV=production
-PORT=3001
-
-# Database
-DATABASE_URL=postgresql://rslvd:password@localhost:5432/rslvd
-
-# Redis (optional)
-REDIS_URL=redis://localhost:6379
-
-# JWT Secret (generate random string)
-JWT_SECRET=your_random_jwt_secret_here
-
-# IONOS DNS API
-IONOS_API_KEY=your_ionos_api_key_here
-
-# Square
-SQUARE_ACCESS_TOKEN=EAAA...
-SQUARE_APPLICATION_ID=sq0idp-...
-SQUARE_LOCATION_ID=L...
-SQUARE_ENVIRONMENT=production
-SQUARE_WEBHOOK_SIGNATURE_KEY=...
-
-# Domain
-BASE_DOMAIN=rslvd.privatedns.org
-APP_URL=https://rslvd.privatedns.org
-SERVER_IP=your_server_ip
-```
-
-### Pricing Plans
-
-Plans are defined in `app/lib/plans.js` and charged via the Square Payments API:
-
-| Plan | Price | Hosts | Tunnels |
-|------|-------|-------|---------|
-| Free | $0 | 2 | 2 |
-| Monthly | $0.99/mo | 4 | 4 |
-| Quarterly | $1.99/3mo | 12 | 12 |
-| Semi-Annual | $4.99/6mo | 24 | 24 |
-| Annual | $8.99/yr | Unlimited | Unlimited |
-
-Remote access (SSH/ADB raw-port tunnels) is not donor-only: a free account can
-hold one SSH and one ADB tunnel in addition to its general tunnels, and these
-are counted separately from the tunnel limit above. Donors and the site owner
-get unlimited SSH and ADB tunnels.
-
-### Site Owner Account
-
-```bash
-# Run setup script
-./setup-owner.sh
-
-# Or manually create admin user in database
-sudo -u rslvd psql rslvd -c "
-INSERT INTO users (email, password_hash, role, is_admin, is_site_owner, plan, subscription_status, max_hosts, max_tunnels)
-VALUES ('admin@yourdomain.com', '\$2a\$10\$...', 'site_owner', true, true, 'annual', 'active', 999, 999);
-"
-```
-
----
-
-## Deployment
-
-### Automated Deployment
-
-The `deploy.sh` script handles full deployment:
-
-```bash
-# On local machine
-scp -r app/ user@server:/tmp/rslvd-app
-ssh user@server 'cd /tmp/rslvd-app && sudo ./deploy.sh'
-```
-
-### Manual Deployment Steps
-
-1. **Upload files** to `/tmp/rslvd-app/`
-2. **Run deploy script** which:
-   - Creates `rslvd` user
-   - Copies application files to `/opt/rslvd/`
-   - Installs npm dependencies
-   - Sets up systemd service
-   - Configures nginx
-   - Requests SSL certificate
-   - Starts services
-
-### Updating the Application
-
-```bash
-# Quick update (frontend only)
-scp app/public/app2.js rslvd@server:/opt/rslvd/public/
-ssh rslvd@server 'sudo systemctl restart rslvd'
-
-# Full update
-./deploy.sh
-```
-
----
-
-## Building Tunnel Client
-
-The tunnel client is a Go binary that establishes reverse TCP tunnels.
-
-### Build All Platforms
-
-```bash
-# Run build script
-sudo ./build-tunnel.sh
-
-# Or build manually
-cd tunnel-client
-
-go build -ldflags="-s -w" -o rslvd-tunnel-linux-amd64 .
-GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o rslvd-tunnel-darwin-arm64 .
-# ... etc for other platforms
-```
-
-### Supported Platforms
-
-| Platform | Binary Name |
-|----------|-------------|
-| Linux AMD64 | `rslvd-tunnel-linux-amd64` |
-| Linux ARM64 | `rslvd-tunnel-linux-arm64` |
-| Linux ARM | `rslvd-tunnel-linux-arm` |
-| Linux MIPS | `rslvd-tunnel-linux-mips` |
-| Linux MIPSLE | `rslvd-tunnel-linux-mipsle` |
-| Linux MIPS64 | `rslvd-tunnel-linux-mips64` |
-| macOS Intel | `rslvd-tunnel-darwin-amd64` |
-| macOS Apple Silicon | `rslvd-tunnel-darwin-arm64` |
-| Windows | `rslvd-tunnel-windows-amd64.exe` |
-
-### Installation Script
-
-Create `/opt/rslvd/public/install.sh`:
-
-```bash
-#!/bin/bash
-# Auto-detect platform and install
-# (See repository for full install script)
-```
-
----
-
-## API Reference
-
-### Authentication
-
-```bash
-# Login
-POST /api/auth/login
-{ "email": "user@example.com", "password": "secret" }
-
-# Response: { "token": "jwt_token_here" }
-# Include token in header: Authorization: Bearer <token>
-```
-
-### Hosts (Dynamic DNS)
-
-```bash
-# List hosts
-GET /api/hosts
-
-# Create host
-POST /api/hosts
-{ "fqdn": "myhost.rslvd.privatedns.org" }
-
-# Update IP (DynDNS compatible)
-GET /api/update?key=<update_key>&ip=1.2.3.4
-
-# Regenerate key
-POST /api/hosts/:id/regenerate-key
-```
-
-### Tunnels
-
-```bash
-# List tunnels (remote-access rows include is_remote, remote_host, remote_port)
-GET /api/tunnels
-
-# Create tunnel — protocol: tcp | udp | ssh | adb
-POST /api/tunnels
-{ "name": "mytunnel", "target_port": 8080 }
-{ "name": "myserver", "target_port": 22, "protocol": "ssh" }   # premium
-{ "name": "myphone",  "target_port": 5555, "protocol": "adb" } # premium
-
-# Remote-access availability for the current plan
-GET /api/tunnels/remote-access
-
-# Delete tunnel
-DELETE /api/tunnels/:id
-```
-
-**Remote access (premium).** `ssh` and `adb` tunnels get a real public port on the
-server (`tunnel_port`, 20000-29999) wired straight through to the client's local
-port — no HTTP, no TLS termination, so binary protocols work end to end:
-
-```bash
-rslvd-tunnel -ssh TOKEN 22      # exposes local SSH
-rslvd-tunnel -adb TOKEN 5555    # exposes a device's adbd (adb tcpip 5555)
-rslvd-tunnel -adb TOKEN 5037    # exposes a PC's adb server
-
-ssh -p <public_port> user@<tunnel-subdomain>   # e.g. user@myserver.rslvd.net
-adb connect <tunnel-subdomain>:<public_port>   # e.g. adb connect termux-adb.rslvd.net:20002
-```
-
-Any active paid plan or a site-owner/admin account unlocks remote access; free plans
-see a locked preview with an upgrade CTA. The proxy enforces the plan at handshake
-time as well as in the API.
-
-### Billing
-
-```bash
-# Get plans
-GET /api/billing/plans
-
-# Checkout
-POST /api/billing/checkout
-{ "plan": "annual" }
-
-# Customer portal
-POST /api/billing/portal
-
-# Cancel subscription
-POST /api/billing/cancel
-```
-
-### Admin (Site Owner Only)
-
-```bash
-GET /api/admin/stats
-GET /api/admin/users
-GET /api/admin/hosts
-GET /api/admin/tunnels
-GET /api/admin/activity
-PATCH /api/admin/users/:id
-DELETE /api/admin/users/:id
-GET /api/admin/config      # deployment info + tunable settings
-PATCH /api/admin/config    # { "settings": { "donation_goal_cents": 3000 } }
-GET /api/admin/logs        # last N service log lines this run (owner only)
-```
-
----
-
-## Development
-
-### Local Setup
-
-```bash
-cd app
-npm install
-npm run dev
-```
-
-### Database Migrations
-
-```bash
-# Run migrations
-node -e "require('./db/migrate').run()"
-
-# Migrations are in db/migrate.js
-# Auto-run on server start
-```
-
-### Frontend Development
-
-The frontend is a single-page React app in `app/public/app.js`:
-
-```javascript
-// Built with React.createElement (no build step required)
-// Edit app/public/app.js directly
-```
-
-### Testing Scripts
-
-```bash
-./test.sh              # Run all tests
-./test-account.sh      # Test user registration
-./test-block.sh        # Test subscription blocking
-./test-nested.sh       # Test nested subdomains
-./test-tcp-tunnel.sh   # Test tunnel functionality
-./verify-activity.sh   # Test activity logging
-```
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**App won't start:**
-```bash
-# Check logs
-sudo journalctl -u rslvd -f
-
-# Verify database connection
-sudo -u rslvd psql $DATABASE_URL -c "SELECT 1"
-```
-
-**SSL certificate issues:**
-```bash
-# Renew manually
-sudo certbot renew --force-renewal
-
-# Check nginx config
-sudo nginx -t
-```
-
-**Tunnel connection fails:**
-```bash
-# Check ports are open
-sudo netstat -tlnp | grep -E '7000|7001'
-
-# Test DNS resolution
-nslookup rslvd.privatedns.org 8.8.8.8
-```
-
-**IONOS DNS errors:**
-```bash
-# Test IONOS API
-./certbot-hooks/test-ionos.sh
-```
-
-### Logs
-
-```bash
-# Application logs
-sudo journalctl -u rslvd -n 100 --no-pager
-
-# Nginx logs
-sudo tail -f /var/log/nginx/rslvd.privatedns.org-error.log
-
-# Tunnel proxy logs (in app logs)
-sudo journalctl -u rslvd | grep "TUNNEL"
-```
-
-### Firewall Configuration
-
-```bash
-# UFW
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw allow 7000/tcp
-sudo ufw allow 7001/tcp
-
-# iptables
-sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 7000 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 7001 -j ACCEPT
-```
-
----
-
-## Security Considerations
-
-1. **Change default passwords** - Update all secrets in `.env`
-2. **Enable firewall** - Only expose necessary ports
-3. **Regular updates** - Keep Node.js, PostgreSQL, and system packages updated
-4. **Backup database** - Automated backups recommended
-5. **Monitor logs** - Watch for suspicious activity
-6. **Rate limiting** - Built-in on API endpoints
-7. **JWT expiration** - Tokens expire after 24 hours
-
----
-
-## License
-
-MIT License - See [LICENSE](LICENSE) file
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
----
-
-## Support
-
-- **Issues:** [GitHub Issues](https://github.com/yourusername/rslvd.privatedns.org/issues)
-- **Email:** admin@rslvd.privatedns.org support@rslvd.privatedns.org *@rslvd.privatedns.org
-
-- **Documentation:** This README and inline code comments
-
----
-
-**Built with ❤️ by the rslvd.privatedns.org team** 
+## Licence
+
+AGPL-3.0-or-later — see [LICENCE.md](LICENCE.md). The code is free to run, modify and self-host; the
+"rslvd" name, logo and domain are reserved, so [fork and rebrand](#forking-and-rebranding) rather
+than deploy under this name. No warranty, no SLA — the service is funded by donations and run by
+volunteers.

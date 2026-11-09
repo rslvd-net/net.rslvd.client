@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # rslvd-tunnel installer — one line install:
-#   curl -fsSL https://rslvd.privatedns.org/install.sh | bash
+#   curl -fsSL https://rslvd.net/install.sh | bash
 #
 # Installs the native Go binary — no SSH, no dependencies needed.
 set -eu
 
-BASE_URL="https://rslvd.privatedns.org/dl"
+BASE_URL="https://rslvd.net/dl"
 
 # ── Pick the install directory ───────────────────────────────────────────────
 # Termux — and every Termux fork, including the rslvd Terminal app — exports
@@ -80,7 +80,7 @@ fi
 # curl -f alone does not prove we got a binary. ELF magic = 7f 45 4c 46.
 if [ "$(head -c 4 "$TMP" | od -An -tx1 | tr -d ' \n')" != "7f454c46" ]; then
   echo "  ✗ ${FILENAME} is not a runnable binary (bad architecture or server error)"
-  echo "    Try again, or report it at https://rslvd.privatedns.org/support"
+  echo "    Try again, or report it at https://rslvd.net/support"
   exit 1
 fi
 
@@ -112,7 +112,7 @@ if ! VERSION=$("$BINARY" --version 2>/dev/null); then
   echo "  ✗ Installed to $BINARY, but it will not start on this device."
   echo "    On Android this means the binary was built against glibc instead of"
   echo "    being statically linked — please report it:"
-  echo "    https://rslvd.privatedns.org/support"
+  echo "    https://rslvd.net/support"
   exit 1
 fi
 echo "  ✓ Installed: $BINARY  ($VERSION)"
@@ -123,5 +123,5 @@ echo ""
 echo "  Example (expose local port 8080):"
 echo "    rslvd-tunnel abc123... 8080"
 echo ""
-echo "  Get your token from: https://rslvd.privatedns.org/dashboard"
+echo "  Get your token from: https://rslvd.net/dashboard"
 echo ""

@@ -1,4 +1,4 @@
-// rslvd.privatedns.org Service Worker — offline shell + DDNS background sync
+// rslvd.net Service Worker — offline shell + DDNS background sync
 
 const CACHE_NAME = 'rslvd-v5';
 const SHELL_ASSETS = [

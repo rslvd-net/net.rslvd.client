@@ -105,7 +105,7 @@ async function reconcilePending() {
         await setIntentStatus(intent.id, 'abandoned');
         continue;
       }
-      const payment = await executeIntent(intent, 'rslvd.privatedns.org donation (reconciled)');
+      const payment = await executeIntent(intent, 'rslvd.net donation (reconciled)');
       const bonus = await applyDonation(intent, payment);
       console.log(`Billing: reconciled donation intent ${intent.id} — donor access through ${bonus.expires.toISOString()}`);
     } catch (err) {

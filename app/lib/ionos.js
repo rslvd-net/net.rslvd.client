@@ -24,7 +24,7 @@ async function getZone(zoneId) {
 
 async function findZoneForDomain(domain) {
   const zones = await getZones();
-  // Find zone matching rslvd.privatedns.org
+  // Find zone matching rslvd.net
   return zones.find(z => domain.endsWith(z.name) || z.name === process.env.BASE_DOMAIN);
 }
 
